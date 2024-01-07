@@ -11,6 +11,7 @@ on:
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
+  QT_VERSION: 6.5.3
 
 jobs:
   build:
@@ -20,6 +21,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    -   name: Install dependencies
+        run: |
+          sudo apt-get update -yq &&
+          sudo apt-get install imagemagick libssh-dev libtesseract-dev libpoppler-dev libqt6widgets6
+          
     - uses: actions/checkout@v3
 
     - name: Configure CMake
