@@ -18,6 +18,15 @@ jobs:
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'c-cpp' ]
 
     steps:
     - name: Install QT6
@@ -39,10 +48,16 @@ jobs:
     - name: Build
       # Build your program with the given configuration
       run: cmake -DCMAKE_BUILD_TYPE=Release ${{github.workspace}}
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
 
-    #- name: Test
-    #  working-directory: ${{github.workspace}}/build
-      # Execute tests defined by the CMake configuration.
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-     # run: ctest -C ${{env.BUILD_TYPE}}
+
 
