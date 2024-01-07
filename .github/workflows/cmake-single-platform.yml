@@ -1,6 +1,6 @@
 # This starter workflow is for a CMake project running on a single platform. There is a different starter workflow if you need cross-platform coverage.
 # See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
-name: Build on Ubuntu with code analysis
+name: Build on Arch with code analysis
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
     permissions:
       actions: read
@@ -29,16 +29,16 @@ jobs:
         language: [ 'c-cpp' ]
 
     steps:
-    - name: Install QT6
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: 6.6.*
-        modules: qtpdf
+    #- name: Install QT6
+    #  uses: jurplel/install-qt-action@v3
+    #  with:
+    #    version: 6.6.*
+    #    modules: qtpdf
       
-    -   name: Install dependencies
-        run: |
-          sudo apt-get update -yq &&
-          sudo apt-get install libmagick++-dev libssh-dev libtesseract-dev libpoppler-cpp-dev
+    #-   name: Install dependencies
+    #    run: |
+    #      sudo apt-get update -yq &&
+    #      sudo apt-get install libmagick++-dev libssh-dev libtesseract-dev libpoppler-cpp-dev
           
     - uses: actions/checkout@v4
     
