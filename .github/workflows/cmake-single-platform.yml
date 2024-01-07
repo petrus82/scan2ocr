@@ -53,6 +53,9 @@ jobs:
     - name: Build
       # Build your program with the given configuration
       run: cmake -DCMAKE_BUILD_TYPE=Release ${{github.workspace}}
+
+    - name: Run make
+      run: make
         
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
