@@ -21,10 +21,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install QT6
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: 6.6.2*
+      
     -   name: Install dependencies
         run: |
           sudo apt-get update -yq &&
-          sudo apt-get install imagemagick libssh-dev libtesseract-dev libpoppler-dev libqt6widgets6
+          sudo apt-get install imagemagick libssh-dev libtesseract-dev libpoppler-dev
           
     - uses: actions/checkout@v3
 
