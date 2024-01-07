@@ -38,7 +38,7 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration
-      run: cmake -DCMAKE_BUILD_TYPE=Release build
+      run: cmake -DCMAKE_BUILD_TYPE=Release ${{github.workspace}}
 
     #- name: Test
     #  working-directory: ${{github.workspace}}/build
