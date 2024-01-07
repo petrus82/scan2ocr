@@ -24,6 +24,7 @@ jobs:
       uses: jurplel/install-qt-action@v3
       with:
         version: 6.6.*
+        modules: PdfWidgets
       
     -   name: Install dependencies
         run: |
