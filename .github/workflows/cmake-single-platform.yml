@@ -23,7 +23,7 @@ jobs:
     - name: Install QT6
       uses: jurplel/install-qt-action@v3
       with:
-        version: 6.6.2
+        version: 6.6.*
       
     -   name: Install dependencies
         run: |
