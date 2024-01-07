@@ -38,7 +38,7 @@ jobs:
     -   name: Install dependencies
         run: |
           sudo apt-get update -yq &&
-          sudo apt-get install imagemagick libssh-dev libtesseract-dev libpoppler-dev
+          sudo apt-get install libmagick++-dev libssh-dev libtesseract-dev libpoppler-dev
           
     - uses: actions/checkout@v3
     
