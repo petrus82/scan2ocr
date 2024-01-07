@@ -48,14 +48,10 @@ jobs:
         languages: ${{ matrix.language }}
 
     - name: Prepare for Build
-      run: cmake ${{github.workspace}}
+      run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
-      # Build your program with the given configuration
-      run: cmake -DCMAKE_BUILD_TYPE=Release ${{github.workspace}}
-
-    - name: Run make
-      run: make
+      run: cmake --build build --target all --config Release -- -j4
         
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
