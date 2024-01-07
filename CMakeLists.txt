@@ -25,6 +25,12 @@ endif()
 # Set the debug flags
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
+# Add CodeQL options
+option(ENABLE_CODEQL "Enable CodeQL analysis" OFF)
+if(ENABLE_CODEQL)
+  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 qt_add_executable(scan2ocr  
     scan2ocr.qrc
     src/cfopen.cpp
@@ -123,6 +129,25 @@ set(CPACK_SOURCE_GENERATOR_TGZ ON)
 
 include(CPack)
 
+# Add CodeQL analysis step
+if(ENABLE_CODEQL)
+  find_program(CODEQL_CLI_EXECUTABLE "codeql")
+  if(CODEQL_CLI_EXECUTABLE)
+    add_custom_target(codeql
+      COMMAND ${CODEQL_CLI_EXECUTABLE} database analyze --format=sarif-latest
+        --output=scan2ocr.sarif -- code-analysis .
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      COMMENT "Running CodeQL analysis"
+    )
+  else()
+    message(WARNING "CodeQL CLI not found. Skipping CodeQL analysis.")
+  endif()
+endif()
 
 # Debug: cmake -DCMAKE_BUILD_TYPE=Debug .
 # Release: cmake -DCMAKE_BUILD_TYPE=Release .
+# With CodeQL:
+# cmake -DENABLE_CODEQL=ON .
+# cmake --build .
+# cmake --build . --target codeql
+# codeql database create code-analysis --language=cpp --command='cmake --build . --target all --config Release -- -j4'
