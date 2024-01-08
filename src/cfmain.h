@@ -36,61 +36,10 @@ public:
     QLabel *lbDestinationDir;
     QPushButton *pbDestinationDir;
 
-    void setupUi(QMainWindow *mWindow)
-    {
-        mWindow->resize(1920, 1080);
-        centralwidget = new QWidget(mWindow);
-        lsFiles = new QListWidget(centralwidget);
-        lsFiles->setGeometry(QRect(30, 80, 331, 971));
-        
-        leFileName = new QLineEdit(centralwidget);
-        leFileName->setGeometry(QRect(430, 20, 431, 25));
-        
-        pbRename = new QPushButton(centralwidget);
-        pbRename->setGeometry(QRect(910, 20, 101, 25));
-        pbDelete = new QPushButton(centralwidget);
-        pbDelete->setGeometry(QRect(30, 20, 101, 25));
-
-        pdfView = new QPdfView(centralwidget);
-        pdfView->setGeometry(QRect(410, 80, 1471, 970));
-        pbProgress = new QProgressBar(centralwidget);
-        pbProgress->setGeometry(QRect(430, 50, 581, 23));
-        pbProgress->setVisible(true);
-        pbProgress->setRange(0,1);
-        pbProgress->setValue(0);
-        lbDestinationDir = new QLabel(centralwidget);
-        lbDestinationDir->setGeometry(QRect(1130, 20, 581, 23));
-        leDestinationDir = new QLineEdit(centralwidget);
-        
-        leDestinationDir->setGeometry(QRect(1130, 50, 431, 25));
-        pbDestinationDir = new QPushButton(centralwidget);
-        pbDestinationDir->setGeometry(QRect(1561, 50, 25, 25));
-        pbDestinationDir->setText("...");
-
-        mWindow->setCentralWidget(centralwidget);
-
-        retranslateUi(mWindow);
-
-        QMetaObject::connectSlotsByName(mWindow);
-        pbRename->setDefault(true);
-        QWidget::setTabOrder(lsFiles, leFileName);
-        QWidget::setTabOrder(leFileName, pbDelete);
-        QWidget::setTabOrder(pbDelete, pbRename);
-        QWidget::setTabOrder(pbRename, leDestinationDir);
-        QWidget::setTabOrder(leDestinationDir, pbDestinationDir);
-    }
-
-    void retranslateUi(QMainWindow *mWindow)
-    {
-        mWindow->setWindowTitle(QCoreApplication::translate("mWindow", "Scan2OCR", nullptr));
-        leFileName->setText(QCoreApplication::translate("mWindow", "pdf file name", nullptr));
-        pbRename->setText(QCoreApplication::translate("mWindow", "&Umbenennen", nullptr));
-        pbDelete->setText(QCoreApplication::translate("mWindow", "&Löschen", nullptr));
-        lbDestinationDir->setText(QCoreApplication::translate("mWindow", "Zielverzeichnis:", nullptr));
-        leDestinationDir->setText("/home/simon/Daten/Dokumente");
-    } // retranslateUi
+    void setupUi(QMainWindow *mWindow);
+    void retranslateUI(QMainWindow *mWindow); 
 private:
-
+    const QString destinationDir {""};
 };
 
 namespace Ui {

@@ -22,12 +22,13 @@ global::getUniqueFileName for temp file name
 
 #include <filesystem>
 #include <string>
+#include <QStandardPaths>
 
 inline namespace constants{
-    constexpr const char* inputDir="/home/simon/";
-    constexpr const char* sshPrivateKeyPath = "/home/simon/.ssh/";
-    constexpr const char* iLanguage = "deu";
-    const std::string iPathDestination = "/home/simon/Desktop/Scans";
+    const std::string inputDir {QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0).toStdString().c_str()};
+    const std::string sshPrivateKeyPath = inputDir + ".ssh/";
+    constexpr const char* Language = "deu";
+    std::string PathDestination;
     constexpr const float Threshold = 0.993; 
     // Get temp dir
     const std::string tmpDir = std::filesystem::temp_directory_path().string() + "/";

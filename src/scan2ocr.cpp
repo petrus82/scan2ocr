@@ -3,6 +3,8 @@
 #include <chrono>
 #include <random>
 #include <QObject>
+#include <QSettings>
+#include <QTranslator>
 #include <Magick++.h>
 #include "cfopen.h"
 #include "cfmain.h"
@@ -27,7 +29,17 @@ int main (int argc,char **argv){
     Magick::InitializeMagick(*argv);
 
     QApplication app(argc, argv);
+    
+    // Setup translations
+    QTranslator translator;
+    Q_UNUSED(translator.load(":/translations/german.qm"));
+    QCoreApplication::installTranslator(&translator);
+    QCoreApplication::setApplicationName("scan2ocr");
+    QCoreApplication::setOrganizationName("scan2ocr");
 
+    // Read PathDestination
+    QSettings settings;
+    PathDestination = settings.value("PathDestination").toString();
     cfOpen wOpen;
     wOpen.show();
     cfMain wMain;

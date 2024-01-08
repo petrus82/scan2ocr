@@ -104,13 +104,13 @@ public:
     void retranslateUi(QWidget *fOpen)
     {
         fOpen->setWindowTitle(QCoreApplication::translate("fOpen", "Scan2OCR", nullptr));
-        pbFile->setText(QCoreApplication::translate("fOpen", "&Datei \303\266ffnen", nullptr));
-        pbPath->setText(QCoreApplication::translate("fOpen", "&Verzeichnis \303\266ffnen", nullptr));
-        pbFinish->setText(QCoreApplication::translate("fOpen", "&Fertig", nullptr));
+        pbFile->setText(QCoreApplication::translate("fOpen", "Open &file", nullptr));
+        pbPath->setText(QCoreApplication::translate("fOpen", "Open &directory", nullptr));
+        pbFinish->setText(QCoreApplication::translate("fOpen", "F&inished", nullptr));
         leHost->setText(QCoreApplication::translate("fOpen", "FTP Server", nullptr));
-        leUser->setText(QCoreApplication::translate("fOpen", "Benutzername", nullptr));
-        leDirectory->setText(QCoreApplication::translate("fOpen", "FTP Verzeichnis", nullptr));
-        lePassword->setText(QCoreApplication::translate("fOpen", "Passwort", nullptr));
+        leUser->setText(QCoreApplication::translate("fOpen", "Username", nullptr));
+        leDirectory->setText(QCoreApplication::translate("fOpen", "FTP directory", nullptr));
+        lePassword->setText(QCoreApplication::translate("fOpen", "Password", nullptr));
         lePort->setText(QCoreApplication::translate("fOpen", "Port", nullptr));
         pbCancel->setText("x");
     } // retranslateUi
@@ -146,6 +146,8 @@ private slots:
 
 private:
     bool Modified(QLineEdit *LineEdit, const std::string Default);
+    const std::string defaultTextHost {leHost->text().toStdString()};
+    const std::string defaultTextDirectory {leDirectory->text().toStdString()};
     PdfFileList *pdfFileList;
 };
 

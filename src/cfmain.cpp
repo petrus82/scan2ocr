@@ -1,5 +1,64 @@
 #include "cfmain.h"
 #include <QMetaMethod>
+#include <QSettings>
+#include <QStandardPaths>
+
+Ui_mWindow::Ui_mWindow() {
+    QSettings settings () ;
+    destinationDir = settings.value("destinationDir",  QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation)).toString();
+}
+
+void Ui_mWindow::setupUi(QMainWindow *mWindow) {
+    mWindow->resize(1920, 1080);
+    centralwidget = new QWidget(mWindow);
+    lsFiles = new QListWidget(centralwidget);
+    lsFiles->setGeometry(QRect(30, 80, 331, 971));
+    
+    leFileName = new QLineEdit(centralwidget);
+    leFileName->setGeometry(QRect(430, 20, 431, 25));
+    
+    pbRename = new QPushButton(centralwidget);
+    pbRename->setGeometry(QRect(910, 20, 101, 25));
+    pbDelete = new QPushButton(centralwidget);
+    pbDelete->setGeometry(QRect(30, 20, 101, 25));
+
+    pdfView = new QPdfView(centralwidget);
+    pdfView->setGeometry(QRect(410, 80, 1471, 970));
+    pbProgress = new QProgressBar(centralwidget);
+    pbProgress->setGeometry(QRect(430, 50, 581, 23));
+    pbProgress->setVisible(true);
+    pbProgress->setRange(0,1);
+    pbProgress->setValue(0);
+    lbDestinationDir = new QLabel(centralwidget);
+    lbDestinationDir->setGeometry(QRect(1130, 20, 581, 23));
+    leDestinationDir = new QLineEdit(centralwidget);
+    
+    leDestinationDir->setGeometry(QRect(1130, 50, 431, 25));
+    pbDestinationDir = new QPushButton(centralwidget);
+    pbDestinationDir->setGeometry(QRect(1561, 50, 25, 25));
+    pbDestinationDir->setText("...");
+
+    mWindow->setCentralWidget(centralwidget);
+
+    retranslateUI(mWindow);
+
+    QMetaObject::connectSlotsByName(mWindow);
+    pbRename->setDefault(true);
+    QWidget::setTabOrder(lsFiles, leFileName);
+    QWidget::setTabOrder(leFileName, pbDelete);
+    QWidget::setTabOrder(pbDelete, pbRename);
+    QWidget::setTabOrder(pbRename, leDestinationDir);
+    QWidget::setTabOrder(leDestinationDir, pbDestinationDir);
+}
+
+void Ui_mWindow::retranslateUI(QMainWindow *mWindow){
+    mWindow->setWindowTitle(QCoreApplication::translate("mWindow", "Scan2OCR", nullptr));
+    leFileName->setText(QCoreApplication::translate("mWindow", "pdf file name", nullptr));
+    pbRename->setText(QCoreApplication::translate("mWindow", "&Rename", nullptr));
+    pbDelete->setText(QCoreApplication::translate("mWindow", "&Delete", nullptr));
+    lbDestinationDir->setText(QCoreApplication::translate("mWindow", "Target directory:", nullptr));
+    leDestinationDir->setText(destinationDir);
+}
 
 cfMain::cfMain(QMainWindow *parent) : QMainWindow(parent)
 {
@@ -131,13 +190,13 @@ void cfMain::rename() {
     // Check if the destination directory exists, if not create it
     if (!std::filesystem::exists(destinationDir)) {
         QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "Verzeichnis existiert nicht", "Das Verzeichnis existiert nicht. Wollen Sie es erstellen?",
+        reply = QMessageBox::question(this, tr("Directory does not exist"), tr("This directory does not exist. Do you want to create it?"),
                                       QMessageBox::Yes|QMessageBox::No);
         if (reply == QMessageBox::Yes) {
             try {
                 std::filesystem::create_directory(destinationDir);
             } catch (std::filesystem::filesystem_error& e) {
-                QMessageBox::critical(this, "Fehler bei der Verzeichnis Erstellung", QString::fromStdString(e.what()));
+                QMessageBox::critical(this, tr("Error while creating directory"), QString::fromStdString(e.what()));
             }
         }
     }
@@ -150,7 +209,7 @@ void cfMain::rename() {
 
     if (std::filesystem::exists(newName)) {
         QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "Datei überschreiben?", "Die Datei ist bereits vorhanden. Wollen Sie " + leFileName->text() + " überschreiben ?",
+        reply = QMessageBox::question(this, tr("Overwrite file?"), tr("This file already exists. Do you really want to overwrite ") + leFileName->text() + tr(" ?"),
                                       QMessageBox::Yes|QMessageBox::No);
         if (reply != QMessageBox::Yes) {
             return;
@@ -169,11 +228,10 @@ void cfMain::rename() {
             std::filesystem::remove(oldName);
         }
         else {
-            QMessageBox::critical(this, "Fehler beim Umbenennen", "Die Datei konnte nicht umbenannt werden.");
-            std::cout << "Filesize new: " << sizeNewFile << " Filesize old: " << sizeOldFile << std::endl;
+            QMessageBox::critical(this, tr("Error while renaming"), tr("This file cannot be renamed."));
         }
     } catch (std::filesystem::filesystem_error& e) {
-        QMessageBox::critical(this, "Fehler beim Umbenennen", QString::fromStdString(e.what()));
+        QMessageBox::critical(this, tr("Error while renaming"), QString::fromStdString(e.what()));
     }
 
     // Now delete all temp files and the source files and clean up the UI
@@ -183,7 +241,7 @@ void cfMain::rename() {
 
 void cfMain::getDestinationDir(){
     QFileDialog PathDialog;
-    QString DestinationDir = PathDialog.getExistingDirectory(this, tr("Zielverzeichnis auswählen"), QString(constants::inputDir));
+    QString DestinationDir = PathDialog.getExistingDirectory(this, tr("Choose target directory"), QString(constants::inputDir));
     leDestinationDir->setText(DestinationDir);
 }
 

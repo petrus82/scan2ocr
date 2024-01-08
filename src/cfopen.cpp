@@ -43,7 +43,7 @@ void cfOpen::OpenFile(){
     QFileDialog FileDialog;
     QString File;
 
-    File = FileDialog.getOpenFileName(this, tr("PDF Datei öffnen"), QString(constants::inputDir), tr("PDF Dateien *.pdf"));
+    File = FileDialog.getOpenFileName(this, tr("Open PDF file"), QString(constants::inputDir), tr("PDF files *.pdf"));
     if(File == ""){
         return;
     }
@@ -63,7 +63,7 @@ void cfOpen::OpenFile(){
 
 void cfOpen::OpenPath(){
     QFileDialog PathDialog;
-    QString PathName = PathDialog.getExistingDirectory(this, tr("Verzeichnis öffnen"), QString(constants::inputDir));
+    QString PathName = PathDialog.getExistingDirectory(this, tr("Open directory"), QString(constants::inputDir));
     if(PathName == ""){
         return;
     }
@@ -104,8 +104,8 @@ bool cfOpen::Modified(QLineEdit *LineEdit, const std::string Default){
 void cfOpen::Finished(){
     ParseUrl url;
 
-    if (Modified(leHost, "FTP Server")
-        && Modified(leDirectory, "FTP Verzeichnis"))
+    if (Modified(leHost, defaultTextHost)
+        && Modified(leDirectory, defaultTextDirectory))
     {
         this->setVisible(false);
 

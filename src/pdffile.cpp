@@ -281,7 +281,7 @@ bool PdfFile::transcodeToTiff() {
 
 bool PdfFile::ocrPdf() {
     tesseract::TessBaseAPI ocr;
-    ocr.Init(NULL, iLanguage, tesseract::OEM_LSTM_ONLY);
+    ocr.Init(NULL, Language, tesseract::OEM_LSTM_ONLY);
 
     // Tesseract always adds .pdf to the file name
     // To have the output of tesseract into m_tempFileName remove the .pdf from m_tempFileName
