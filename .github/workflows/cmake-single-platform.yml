@@ -1,5 +1,4 @@
-# This starter workflow is for a CMake project running on a single platform. There is a different starter workflow if you need cross-platform coverage.
-# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
+# Does not work because ubuntu-latest does not provide magick++-7 yet
 name: Build on Arch with code analysis
 
 on:
@@ -29,6 +28,9 @@ jobs:
         language: [ 'c-cpp' ]
 
     steps:
+    - name: Exit script because ubuntu is not ready yet
+      run: exit 0
+      
     - name: Install QT6
       uses: jurplel/install-qt-action@v3
       with:
