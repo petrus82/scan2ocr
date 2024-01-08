@@ -17,7 +17,7 @@ jobs:
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
     permissions:
       actions: read
@@ -29,16 +29,23 @@ jobs:
         language: [ 'c-cpp' ]
 
     steps:
-    #- name: Install QT6
-    #  uses: jurplel/install-qt-action@v3
-    #  with:
-    #    version: 6.6.*
-    #    modules: qtpdf
+    - name: Install QT6
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: 6.6.*
+        modules: qtpdf
+        
+    - name: Install libmagick++-7
+      run:  |
+        deb http://www.deb-multimedia.org sid main  &&
+        sudo apt-get update -oAcquire::AllowInsecureRepositories=true &&
+        sudo apt-get install deb-multimedia-keyring &&
+        sudo apt-get install libmagick++-7-dev
       
-    #-   name: Install dependencies
-    #    run: |
-    #      sudo apt-get update -yq &&
-    #      sudo apt-get install libmagick++-dev libssh-dev libtesseract-dev libpoppler-cpp-dev
+    -   name: Install other dependencies
+        run: |
+          sudo apt-get update -yq &&
+          sudo apt-get install libssh-dev libtesseract-dev libpoppler-cpp-dev
           
     - uses: actions/checkout@v4
     
