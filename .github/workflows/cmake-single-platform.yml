@@ -37,7 +37,7 @@ jobs:
         
     - name: Install libmagick++-7
       run:  |
-        deb http://www.deb-multimedia.org sid main  &&
+        echo "deb http://www.deb-multimedia.org sid main" >> /etc/apt/sources.list  &&
         sudo apt-get update -oAcquire::AllowInsecureRepositories=true &&
         sudo apt-get install deb-multimedia-keyring &&
         sudo apt-get install libmagick++-7-dev
