@@ -15,7 +15,6 @@ void FtpConnection::getConnection() {
     }
     else {  // Reestablish connection
         if (sftp != nullptr) {
-            std::cout << sftp->session << std::endl;
             sftp_free(sftp);
             sftp = nullptr;
         }
@@ -30,12 +29,12 @@ void FtpConnection::getConnection() {
         ssh_options_set(session, SSH_OPTIONS_PORT, &Port);
     }
 
-    ssh_options_set(session, SSH_OPTIONS_IDENTITY, sshPrivateKeyPath);
+    ssh_options_set(session, SSH_OPTIONS_IDENTITY, sshPrivateKeyPath.c_str());
 
     int rc = ssh_connect(session);
 
     if (rc != SSH_OK) {
-        std::cout << "Error connecting to FTP server: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Error connecting to FTP server: " << ssh_get_error(session) << std::endl;
         return;
     }
 
@@ -45,18 +44,18 @@ void FtpConnection::getConnection() {
     if (rc == SSH_OK) {
         ssh_key_free(server_pubkey);
     } else {
-        std::cout << "Server's host key is not known." << std::endl;
+        std::cerr << "Server's host key is not known." << std::endl;
         return;
     }
 
     // First try to authenticate with the server using ssh-keys
-    rc = ssh_userauth_publickey_auto(session, NULL, constants::sshPrivateKeyPath);
+    rc = ssh_userauth_publickey_auto(session, NULL, constants::sshPrivateKeyPath.c_str());
     if (rc != SSH_AUTH_SUCCESS) {
         // Authentication using keys failed, try user/password
         rc = ssh_userauth_password(session, NULL, ftpPassword.c_str());
         if (rc != SSH_AUTH_SUCCESS) {
             // Also user/password authentication failed, give up
-            std::cout << "Error connecting to FTP server: " << ssh_get_error(session) << std::endl;
+            std::cerr << "Error connecting to FTP server: " << ssh_get_error(session) << std::endl;
             return;
         } 
     }
@@ -65,7 +64,7 @@ void FtpConnection::getConnection() {
     sftp = sftp_new(session);
     rc = sftp_init(sftp);
     if (rc != SSH_OK) {
-        std::cout << "Error initializing SFTP session: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Error initializing SFTP session: " << ssh_get_error(session) << std::endl;
         return;
     }
     else {
@@ -87,7 +86,7 @@ bool FtpConnection::deleteFile(const std::string &url) {
 
     sftp_file file = sftp_open(sftp, cUrl, O_WRONLY, 0);
     if (file == NULL) {
-        std::cout << "Error opening file: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Error opening file: " << ssh_get_error(session) << std::endl;
         return false;
         disconnect();
     }
@@ -95,7 +94,7 @@ bool FtpConnection::deleteFile(const std::string &url) {
     int rc = sftp_unlink(sftp, cUrl);
     sftp_close(file);
     if (rc != SSH_OK) {
-        std::cout << "Error deleting file: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Error deleting file: " << ssh_get_error(session) << std::endl;
         disconnect();
         return false;
     }
@@ -108,7 +107,7 @@ const std::string FtpConnection::getFile(const std::string remoteFilename, const
 
     sftp_file remoteFile = sftp_open(sftp, (remoteDirectory + "/" + remoteFilename).c_str(), O_RDONLY, 0);
     if (remoteFile == NULL) {
-        std::cout << "Error opening file: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Error opening file: " << ssh_get_error(session) << std::endl;
         return nullptr;
     }
 
@@ -116,7 +115,7 @@ const std::string FtpConnection::getFile(const std::string remoteFilename, const
 
     FILE* localFile = fopen((localFilename).c_str(), "wb");
     if (localFile == NULL) {
-        std::cout << "Error opening local file for writing" << std::endl;
+        std::cerr << "Error opening local file for writing" << std::endl;
         sftp_close(remoteFile);
         disconnect();
         return nullptr;
@@ -131,7 +130,7 @@ const std::string FtpConnection::getFile(const std::string remoteFilename, const
 
     // Check for errors
     if (nbytes < 0) {
-        std::cout << "Error reading file: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Error reading file: " << ssh_get_error(session) << std::endl;
         disconnect();
         return nullptr;
     }
@@ -140,7 +139,7 @@ const std::string FtpConnection::getFile(const std::string remoteFilename, const
     int rc = sftp_close(remoteFile);
     fclose(localFile);
     if (rc != SSH_OK) {
-        std::cout << "Error closing file: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Error closing file: " << ssh_get_error(session) << std::endl;
         disconnect();
         return nullptr;
     }
@@ -156,7 +155,7 @@ std::vector<sftp_attributes> FtpConnection::getRemoteDir(std::string directory) 
     dir = sftp_opendir(sftp, directory.c_str());
 
     if (dir == NULL) {
-        std::cout << "Directory not found: " << directory << "\nError: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Directory not found: " << directory << "\nError: " << ssh_get_error(session) << std::endl;
         disconnect();
         return std::vector<sftp_attributes>();
     }
@@ -171,7 +170,7 @@ std::vector<sftp_attributes> FtpConnection::getRemoteDir(std::string directory) 
 
     // Check for errors
     if (!sftp_dir_eof(dir)) {
-        std::cout << "Can't list directory: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Can't list directory: " << ssh_get_error(session) << std::endl;
         sftp_closedir(dir);
         disconnect();
         return std::vector<sftp_attributes>();

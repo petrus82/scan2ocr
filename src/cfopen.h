@@ -113,14 +113,14 @@ public:
         lePassword->setText(QCoreApplication::translate("fOpen", "Password", nullptr));
         lePort->setText(QCoreApplication::translate("fOpen", "Port", nullptr));
         pbCancel->setText("x");
-    } // retranslateUi
+    }
 
 };
 
 
 namespace Ui {
     class fOpen: public Ui_fOpen {};
-} // namespace Ui
+}
 
 QT_END_NAMESPACE
 
@@ -132,7 +132,6 @@ class cfOpen : public QWidget, private Ui::fOpen
 public:
     explicit cfOpen(QWidget *parent = nullptr);
     ~cfOpen();
-    //QCompleter *completer = nullptr;
 public slots:
 
 
@@ -142,7 +141,6 @@ private slots:
     void Finished();
     void Cancel();
     void DeleteText ();
-    //void directoryCompleter(const QString  &text);
 
 private:
     bool Modified(QLineEdit *LineEdit, const std::string Default);

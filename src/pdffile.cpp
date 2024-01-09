@@ -148,7 +148,6 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                     if (filename.size() > 3 && filename.substr(filename.length() - 3) == "pdf"){
                         auto lambdaThread = [=]()-> void{
                             maxStatus += c_statusIncrement;
-                            std::cout << "newFileAdded" << std::endl;
                             emit newFileAdded();
 
                             // We are in a new thread, get a new ftpConnection                            
@@ -161,7 +160,6 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                             PdfFile* pdfFile = new PdfFile(newUrl, tmpFileName, m_Status);
                             pdfFiles.push_back(pdfFile);
 
-                            std::cout << "newFileComplete" << std::endl;
                             emit newFileComplete(filename);
                         };
 
@@ -191,7 +189,7 @@ bool PdfFileList::removeFile(int Element) {
         try {
             std::filesystem::remove(localFile);
         } catch (std::filesystem::filesystem_error& e) {
-            QMessageBox::critical(nullptr, "Error Deleting file", QString::fromStdString(e.what()));
+            QMessageBox::critical(nullptr, tr("Error Deleting file"), QString::fromStdString(e.what()));
             return false;
         }
     }
@@ -220,7 +218,6 @@ bool PdfFileList::removeFile(int Element) {
 PdfFile::PdfFile(ParseUrl Url, const std::string &localCopy, int &status, QObject *parent) : QObject(parent), m_Url(Url), m_LocalCopy(localCopy) {
     if (ptr_cfMain != nullptr) {
         QObject::connect(this, SIGNAL(statusChange()), ptr_cfMain, SLOT(statusUpdate()), Qt::DirectConnection);
-        std::cout << "connected pdfFile::statusChange to statusUpdate" <<  Url.Filename() << std::endl;
     }
     
     // Read PdfFile into Memory
@@ -230,22 +227,18 @@ PdfFile::PdfFile(ParseUrl Url, const std::string &localCopy, int &status, QObjec
     
     status++;
     emit statusChange();
-    std::cout << "Status change " << Url.Filename() <<  std::endl;
     removeEmptyPage();
 
     status++;
     emit statusChange();
-    std::cout << "Status change " <<  Url.Filename() << std::endl;
     transcodeToTiff();
 
     status++;
     emit statusChange();
-    std::cout << "Status change " <<  Url.Filename() << std::endl;
     ocrPdf();
 
     status++;
     emit statusChange();
-    std::cout << "Status change " <<  Url.Filename() << std::endl;
     m_possibleFileName = getPossibleFileName();
 }
 
@@ -294,7 +287,7 @@ bool PdfFile::ocrPdf() {
     // Write OCRPDF to OutputFile
     bool retVal = ocr.ProcessPages(InputOCR.c_str(), NULL, 0,  renderer);
     if (!retVal) {
-        QMessageBox::critical(nullptr, "Error", QString("Error writing output pdf ") + QString::fromStdString(m_tempFileName));
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error writing output pdf ")) + QString::fromStdString(m_tempFileName));
         return false;
     }
 
@@ -327,7 +320,7 @@ std::string PdfFile::getPossibleFileName() {
     std::unique_ptr<poppler::document> pdfDoc(poppler::document::load_from_file (m_tempFileName.c_str()));
     
     if (!pdfDoc) {
-        QMessageBox::critical(nullptr, "Error", QString("Error opening ") + QString::fromStdString(m_tempFileName));
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error opening ")) + QString::fromStdString(m_tempFileName));
         return "";
     }
 
@@ -335,7 +328,7 @@ std::string PdfFile::getPossibleFileName() {
     std::unique_ptr<poppler::page> firstPage(pdfDoc->create_page(0));
 
     if (!firstPage) {
-        QMessageBox::critical(nullptr, "Error", QString("Error getting first page"));
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error getting first page")));
         return "";
     }
 
@@ -381,9 +374,12 @@ std::string PdfFile::getPossibleFileName() {
         possibleFileName = ss.str() + possibleFileName;
     }
 
-    // Check if the file is an invoice, if so add the word "Rechnung" to the filename   
-    if (text.find("Rechnung") != std::string::npos) {
-        possibleFileName += " - Rechnung";
+    // Check if the file is an invoice
+    // first we have to get the current application language
+    const std::string invoiceString {QString(tr("Invoice")).toStdString()};
+
+    if (text.find(invoiceString) != std::string::npos) {
+        possibleFileName += " - " + invoiceString;
     }
 
     possibleFileName += ".pdf";

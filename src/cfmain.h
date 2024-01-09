@@ -36,10 +36,13 @@ public:
     QLabel *lbDestinationDir;
     QPushButton *pbDestinationDir;
 
+    Ui_mWindow();
+    ~Ui_mWindow() = default;
+    
     void setupUi(QMainWindow *mWindow);
     void retranslateUI(QMainWindow *mWindow); 
 private:
-    const QString destinationDir {""};
+    QString destinationDir {""};
 };
 
 namespace Ui {

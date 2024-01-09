@@ -1,4 +1,3 @@
-//#include "scan2ocr.h"
 #include "cfopen.h"
 
 cfOpen::cfOpen(QWidget *parent) : QWidget(parent)
@@ -43,7 +42,7 @@ void cfOpen::OpenFile(){
     QFileDialog FileDialog;
     QString File;
 
-    File = FileDialog.getOpenFileName(this, tr("Open PDF file"), QString(constants::inputDir), tr("PDF files *.pdf"));
+    File = FileDialog.getOpenFileName(this, tr("Open PDF file"), QString::fromStdString(constants::inputDir), tr("PDF files *.pdf"));
     if(File == ""){
         return;
     }
@@ -63,7 +62,7 @@ void cfOpen::OpenFile(){
 
 void cfOpen::OpenPath(){
     QFileDialog PathDialog;
-    QString PathName = PathDialog.getExistingDirectory(this, tr("Open directory"), QString(constants::inputDir));
+    QString PathName = PathDialog.getExistingDirectory(this, tr("Open directory"), QString::fromStdString(constants::inputDir));
     if(PathName == ""){
         return;
     }

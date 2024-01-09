@@ -4,7 +4,7 @@
 #include <QStandardPaths>
 
 Ui_mWindow::Ui_mWindow() {
-    QSettings settings () ;
+    QSettings settings;
     destinationDir = settings.value("destinationDir",  QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation)).toString();
 }
 
@@ -241,8 +241,8 @@ void cfMain::rename() {
 
 void cfMain::getDestinationDir(){
     QFileDialog PathDialog;
-    QString DestinationDir = PathDialog.getExistingDirectory(this, tr("Choose target directory"), QString(constants::inputDir));
-    leDestinationDir->setText(DestinationDir);
+    QString destDir = PathDialog.getExistingDirectory(this, tr("Choose target directory"), QString::fromStdString(constants::inputDir));
+    leDestinationDir->setText(destDir);
 }
 
 void cfMain::directoryCompleter(const QString &text) {

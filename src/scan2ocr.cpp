@@ -1,13 +1,22 @@
 #include "scan2ocr.h"
-#include <string>
 #include <chrono>
 #include <random>
+#include <string>
+#include <QString>
 #include <QObject>
 #include <QSettings>
 #include <QTranslator>
 #include <Magick++.h>
 #include "cfopen.h"
 #include "cfmain.h"
+
+namespace constants {
+    const std::string PathDestination = []() {
+        QSettings settings;
+        QString path = settings.value("PathDestination").toString();
+        return path.toStdString();
+    }();
+}
 
 std::string getUniqueFileName() {
     // Get current date and time
@@ -37,9 +46,6 @@ int main (int argc,char **argv){
     QCoreApplication::setApplicationName("scan2ocr");
     QCoreApplication::setOrganizationName("scan2ocr");
 
-    // Read PathDestination
-    QSettings settings;
-    PathDestination = settings.value("PathDestination").toString();
     cfOpen wOpen;
     wOpen.show();
     cfMain wMain;
