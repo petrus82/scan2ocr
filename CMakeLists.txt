@@ -35,16 +35,12 @@ set(SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(SOURCE_FILES
   CMakeLists.txt
   scan2ocr.qrc
-  src/cfopen.cpp
-  src/cfmain.cpp
   src/mainwindow.cpp
   src/pdffile.cpp
   src/scan2ocr.cpp
   src/ftpconnection.cpp
   src/parseurl.cpp
   src/mainwindow.h
-  src/cfopen.h
-  src/cfmain.h
   src/pdffile.h
   src/ftpconnection.h
   src/parseurl.h
@@ -52,7 +48,6 @@ set(SOURCE_FILES
 )
 
 qt_add_executable(scan2ocr  
-    scan2ocr.qrc
     ${SOURCE_FILES}
 )
 

@@ -7,8 +7,8 @@
 #include <QSettings>
 #include <QTranslator>
 #include <Magick++.h>
-#include "cfopen.h"
-#include "cfmain.h"
+//#include "cfopen.h"
+//#include "cfmain.h"
 #include "mainwindow.h"
 
 namespace constants {
@@ -45,6 +45,7 @@ int main (int argc,char **argv){
     Q_UNUSED(translator.load(":/translations/german.qm"));
     QCoreApplication::installTranslator(&translator);
     QCoreApplication::setApplicationName("scan2ocr");
+    QCoreApplication::setApplicationVersion("0.0.2");
     QCoreApplication::setOrganizationName("scan2ocr");
 
     /* cfOpen wOpen;
