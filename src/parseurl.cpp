@@ -2,38 +2,38 @@
 #include "parseurl.h"
 
 ParseUrl::ParseUrl (const std::string Url) {
-    url = Url;
+    m_url = Url;
     // Url = scheme://[user]:[password]@host[:port]/directory/subdirectory/filename.extension
     int beginSearch {0};
 
-    scheme = url.substr(0, Url.find("://"));
+    scheme = m_url.substr(0, Url.find("://"));
     beginSearch = scheme.length() + 3;
 
     // check if user or password is present
-    if (url.find("@", beginSearch) != std::string::npos) {
+    if (m_url.find("@", beginSearch) != std::string::npos) {
         // check if user and password are present
-        int searchPosition = url.find(":", beginSearch);
-        if (searchPosition > 0 and searchPosition < url.find("@", beginSearch)) {
+        int searchPosition = m_url.find(":", beginSearch);
+        if (searchPosition > 0 and searchPosition < m_url.find("@", beginSearch)) {
             // user and password
-            username = url.substr(beginSearch, searchPosition - beginSearch);
-            beginSearch = url.find(":", beginSearch) + 1;
-            password = url.substr(beginSearch, url.find("@", beginSearch) - beginSearch);
-            beginSearch = url.find("@", beginSearch) + 1;
+            username = m_url.substr(beginSearch, searchPosition - beginSearch);
+            beginSearch = m_url.find(":", beginSearch) + 1;
+            password = m_url.substr(beginSearch, m_url.find("@", beginSearch) - beginSearch);
+            beginSearch = m_url.find("@", beginSearch) + 1;
         } else {
             // only user
-            username = url.substr(beginSearch, url.find("@", beginSearch) - beginSearch);
-            beginSearch = url.find("@", beginSearch) + 1;
+            username = m_url.substr(beginSearch, m_url.find("@", beginSearch) - beginSearch);
+            beginSearch = m_url.find("@", beginSearch) + 1;
         }
     }
     // Check if port is present
-    if (url.find(":", beginSearch) != std::string::npos) {
-        host = url.substr(beginSearch, url.find(":", beginSearch) - beginSearch);
-        beginSearch = url.find(":", beginSearch) + 1;
+    if (m_url.find(":", beginSearch) != std::string::npos) {
+        host = m_url.substr(beginSearch, m_url.find(":", beginSearch) - beginSearch);
+        beginSearch = m_url.find(":", beginSearch) + 1;
         try
         {
-            std::string ports = url.substr(beginSearch, url.find("/", beginSearch) - beginSearch);
+            std::string ports = m_url.substr(beginSearch, m_url.find("/", beginSearch) - beginSearch);
             port = std::stoi(ports);
-            beginSearch = url.find("/", beginSearch);
+            beginSearch = m_url.find("/", beginSearch);
         }
         catch(const std::exception& e)
         {
@@ -41,23 +41,23 @@ ParseUrl::ParseUrl (const std::string Url) {
         }
     }
     else if (scheme == "sftp") { // No Port and host should be present
-        host = url.substr(beginSearch, url.find("/", beginSearch) - beginSearch);
-        beginSearch = url.find("/", beginSearch);
+        host = m_url.substr(beginSearch, m_url.find("/", beginSearch) - beginSearch);
+        beginSearch = m_url.find("/", beginSearch);
     }
 
     // Directory is everything remaining left of the last /
-    directory = url.substr(beginSearch, url.rfind("/") - beginSearch + 1);
-    beginSearch = url.rfind("/") + 1;
+    directory = m_url.substr(beginSearch, m_url.rfind("/") - beginSearch + 1);
+    beginSearch = m_url.rfind("/") + 1;
 
     // Filename is everything right of the last /
-    filename = url.substr(beginSearch, url.rfind("/") - beginSearch);
+    filename = m_url.substr(beginSearch, m_url.rfind("/") - beginSearch);
 
     // remove file extension
     rawFilename = filename.substr(0, filename.length() - 4);
 }
 
 ParseUrl::ParseUrl () {
-    url = "";
+    m_url = "";
 }
 
 std::string ParseUrl::Scheme() const {
@@ -124,40 +124,42 @@ void ParseUrl::Port (const int Port) {
     port = Port;
 }
 
-std::string ParseUrl::getUrl () {
-    url = directory + filename;
+std::string ParseUrl::Url () {
+    m_url = directory + filename;
     if (scheme == "file") {
-        url = "file://" + url;
+        m_url = "file://" + m_url;
     }
     else {
         // check if we have port
         if (port != 0) {
-            url = ":" + std::to_string(port) + url;
+            m_url = ":" + std::to_string(port) + m_url;
         }
-        url = host + url;
+        m_url = host + m_url;
 
         // check if we have password
         if (password != "") {
-            url = username + ":" + password + "@" + url;
+            m_url = username + ":" + password + "@" + m_url;
         }
         else if (username != "") {
-            url = username + "@" + url;
+            m_url = username + "@" + m_url;
         }
-        url = "sftp://" + url;
+        m_url = "sftp://" + m_url;
     }
-    return url;
-}
-std::string ParseUrl::Url () const {
-    return url;
+    return m_url;
 }
 
-QUrl ParseUrl::qUrl () const {
-    return QUrl(QString::fromStdString(url));
+void ParseUrl::Url (const std::string Url) {
+    m_url = Url;
+}
+
+QUrl ParseUrl::qUrl () {
+    QUrl qurl(QString::fromStdString(Url()));
+    return  qurl;
 }
 
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

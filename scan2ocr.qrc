@@ -1,6 +1,11 @@
 <RCC>
-    <qresource prefix="/images">
-        <file>writing.png</file>
+    <qresource>
+        <file>images/writing.png</file>
+        <file>images/file.png</file>
+        <file>images/directory.png</file>
+        <file>images/network.png</file>
+        <file>images/rename.png</file>
+        <file>images/delete.png</file>
     </qresource>
     <qresource prefix="/translations">
 	<file>german.ts</file>

@@ -31,38 +31,24 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 #  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # endif()
 
-qt_add_executable(scan2ocr  
-    scan2ocr.qrc
-    src/cfopen.cpp
-    src/cfmain.cpp
-    src/pdffile.cpp
-    src/scan2ocr.cpp
-    src/ftpconnection.cpp
-    src/parseurl.cpp
-    src/cfopen.h
-    src/cfmain.h
-    src/pdffile.h
-    src/ftpconnection.h
-    src/parseurl.h
-    src/scan2ocr.h
-)
-
 set(SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(SOURCE_FILES
   CMakeLists.txt
   scan2ocr.qrc
-  src/cfopen.cpp
-  src/cfmain.cpp
+  src/mainwindow.cpp
   src/pdffile.cpp
   src/scan2ocr.cpp
   src/ftpconnection.cpp
   src/parseurl.cpp
-  src/cfopen.h
-  src/cfmain.h
+  src/mainwindow.h
   src/pdffile.h
   src/ftpconnection.h
   src/parseurl.h
   src/scan2ocr.h
+)
+
+qt_add_executable(scan2ocr  
+    ${SOURCE_FILES}
 )
 
 # Add translation

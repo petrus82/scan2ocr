@@ -7,8 +7,9 @@
 #include <QSettings>
 #include <QTranslator>
 #include <Magick++.h>
-#include "cfopen.h"
-#include "cfmain.h"
+//#include "cfopen.h"
+//#include "cfmain.h"
+#include "mainwindow.h"
 
 namespace constants {
     const std::string PathDestination = []() {
@@ -44,13 +45,16 @@ int main (int argc,char **argv){
     Q_UNUSED(translator.load(":/translations/german.qm"));
     QCoreApplication::installTranslator(&translator);
     QCoreApplication::setApplicationName("scan2ocr");
+    QCoreApplication::setApplicationVersion("0.0.2");
     QCoreApplication::setOrganizationName("scan2ocr");
 
-    cfOpen wOpen;
+    /* cfOpen wOpen;
     wOpen.show();
     cfMain wMain;
     wMain.show();
-    wOpen.setFocus();
+    wOpen.setFocus(); */
+    MainWindow mainWindow;
+    mainWindow.show();
 
 /*  
     Testing for _parseUrl:
