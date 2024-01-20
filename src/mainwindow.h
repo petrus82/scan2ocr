@@ -26,35 +26,12 @@
 
 QT_BEGIN_NAMESPACE
 
-class clickableLineEdit : public QLineEdit {
-    Q_OBJECT
-public:
-    clickableLineEdit(QWidget *parent = nullptr) : QLineEdit(parent) {};
-
-    bool event (QEvent* ev) override;
-
-signals:
-    void clicked();
-};
-
 class MainWindow : public QMainWindow {
 
 Q_OBJECT
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-    QGridLayout *mainLayout;
-    QWidget *centralWidget;
-    QListWidget *lsFiles;
-    QLineEdit *leFileName;
-    QPushButton *pbRename;
-    //QPushButton *pbDelete;
-    QPdfView *pdfView;
-    QProgressBar *pbProgress;
-    QLineEdit *leDestinationDir;
-    QLabel *lbDestinationDir;
-    QPushButton *pbDestinationDir;
-    QComboBox *cbNetworkProfiles;
 
 public slots:
     void loadPdf(const QString &fileName);
@@ -81,38 +58,53 @@ private slots:
     void deleteText ();
 
 private:
+
     void createMenu();
-    void createNetworkMenuEntry (ParseUrl &Url);
+    void createNetworkMenuEntry (Scan2ocr::s_networkProfile &netProfile);
     void createOtherWidgets();
-    void getNetworkProfiles();
+    std::vector<std::unique_ptr<s_networkProfile>> getNetworkProfiles();
     void setTabOrder();
     void setText();
     void connectSignals();
     void deleteFile (const int element);
     
-    QToolBar *toolBar;
-    QMenu *fileMenu;
-    QMenu *networkProfileMenu;
-    QAction *openFileAction;
-    QAction *openPathAction;
-    QAction *addProfileAction;
-    QAction *deleteProfileAction;
-    QAction *defaultProfileAction;
-    QAction *renameAction;
-    QAction *deleteAction;
-    QAction *settingsAction;
-    QAction *cancelAction;
-    QAction *aboutAction;
+    QWidget centralWidget {this};
+    QGridLayout mainLayout {&centralWidget};
+    QPdfView pdfView {&centralWidget};
+    QToolBar toolBar {this};
+    QListWidget lsFiles {&centralWidget};
+    QLineEdit leFileName {&centralWidget};
+    QPushButton pbRename {&centralWidget};
+    QProgressBar pbProgress {&centralWidget};
+    QLineEdit leDestinationDir {&centralWidget};
+    QLabel lbDestinationDir {&centralWidget};
+    QPushButton pbDestinationDir {&centralWidget};
+
+    QMenu *fileMenu {menuBar()->addMenu(tr("F&ile"))};
+    QMenu *networkProfileMenu {nullptr};
+    QAction openFileAction {tr("&Open File..."), this};
+    QAction openPathAction {tr("Open &Directory..."), this};
+    QAction addProfileAction {tr("Add &Profile..."), this};
+    QAction deleteProfileAction {tr("Delete &Profile..."), this};
+    QAction defaultProfileAction {tr("Default &Profile..."), this};
+    QAction renameAction {tr("&Rename File"), this};
+    QAction deleteAction {tr("De&lete File"), this};
+    QAction settingsAction {tr("Se&ttings..."), this};
+    QAction cancelAction {tr("&Quit"), this};
+    QAction aboutAction {tr("Abou&t"), this};
+    std::unique_ptr<QComboBox> cbNetworkProfiles {nullptr};
+    std::unique_ptr<QAction> networkProfileAction {nullptr};
 
     QString destinationDir {""};
-    QPdfDocument *pdfDocument = nullptr;
-    QCompleter *completer = nullptr;
+    QPdfDocument pdfDocument;
+    QCompleter completer;
 
     bool Modified(QLineEdit *LineEdit, const std::string Default);
     const std::string defaultTextHost {""}; //{leHost->text().toStdString()};
     const std::string defaultTextDirectory {""}; //{leDirectory->text().toStdString()};
     
-    PdfFileList *pdfFileList;
+    PdfFileList *pdfFileList {nullptr};
+    Settings settings;
 };
 
 QT_END_NAMESPACE

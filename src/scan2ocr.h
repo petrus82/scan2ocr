@@ -23,6 +23,7 @@ global::getUniqueFileName for temp file name
 #include <filesystem>
 #include <string>
 #include <QStandardPaths>
+#include "parseurl.h"
 
 inline namespace constants{
     const std::string inputDir {QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0).toStdString().c_str()};
@@ -31,6 +32,41 @@ inline namespace constants{
     extern const std::string PathDestination;
     constexpr const float Threshold = 0.993; 
     // Get temp dir
+    const std::string tmpDir = std::filesystem::temp_directory_path().string() + "/";
+}
+
+inline namespace Scan2ocr {
+    enum class ThresholdMethod {
+        autoThreshold,
+        adaptiveThreshold,
+        threshold
+    };
+
+    enum class Language {
+        deu,
+        eng
+    };
+
+    struct s_networkProfile {
+        std::string name;
+        ParseUrl url;
+    };
+
+    struct s_documentProfile {
+        Scan2ocr::Language language {Scan2ocr::Language::deu};
+        int resolution {600};
+        Scan2ocr::ThresholdMethod thresholdMethod {Scan2ocr::ThresholdMethod::autoThreshold};
+        float thresholdValue {0.993};
+    };
+
+    struct s_ProfileElement {
+        std::string Element;
+        bool isNumerical;
+        bool isRequired;
+    };
+
+    const std::string inputDir {QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0).toStdString().c_str()};
+    const std::string sshPrivateKeyPath = inputDir + ".ssh/";
     const std::string tmpDir = std::filesystem::temp_directory_path().string() + "/";
 }
 
