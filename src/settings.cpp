@@ -10,7 +10,114 @@ bool clickableLineEdit::event (QEvent* ev) {
     return QWidget::event(ev);
 }
 
-Settings::Settings(QWidget *parent) : QWidget(parent) {
+Settings::Settings (QWidget *parent) : QWidget(parent) {
+    qdSettings.setWindowTitle(tr("Settings"));
+    qdSettings.setMinimumSize(600, 400);
+    qtwSettings.setParent(&qdSettings);
+    qtwSettings.move(20,20);
+    
+    createNetworkTab();
+    createDocumentTab();
+    createPathTab();
+    
+    layoutDialog.addWidget(&qtwSettings);
+    buttonBox.setStandardButtons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel | QDialogButtonBox::Apply);
+    buttonBox.button(QDialogButtonBox::Apply)->setEnabled(false);
+    layoutDialog.addWidget(&buttonBox);
+    layoutDialog.setAlignment(Qt::AlignRight);
+}
+
+void Settings::createNetworkTab() {
+    qtwSettings.setTabText(0, tr("Network profiles"));
+
+    qNetworkWidget.setLayout(&layoutNetworkV);
+    layoutNetworkV.addLayout(&layoutNetworkH);
+    
+    lwNetworkProfiles.addItem("boettger-r farbe");
+    lwNetworkProfiles.addItem("boettger-r grau");
+    layoutNetworkH.addWidget(&lwNetworkProfiles);
+
+    layoutNetworkForm.addRow(tr("Host: "), &leHost);
+    sbPort.setRange(1, 65535);
+    sbPort.setValue(22);
+    layoutNetworkForm.addRow(tr("Port: "), &sbPort);
+    layoutNetworkForm.addRow(tr("Directory: "), &leDirectory);
+    layoutNetworkForm.addRow(tr("Username: "), &leUsername);
+    lePassword.setEchoMode(QLineEdit::PasswordEchoOnEdit);
+    layoutNetworkForm.addRow(tr("Password: "), &lePassword);
+
+    layoutNetworkH.addLayout(&layoutNetworkForm);
+
+    pbAdd.setText(tr("&Add"));
+    layoutNetworkButtons.addWidget(&pbAdd);
+    pbRemove.setText(tr("&Remove"));
+    layoutNetworkButtons.addWidget(&pbRemove);
+    pbSetDefault.setText(tr("Set &Default"));
+    layoutNetworkButtons.addWidget(&pbSetDefault);
+    layoutNetworkButtons.setEnabled(false);
+
+    layoutNetworkV.addLayout(&layoutNetworkButtons);
+    layoutNetworkH.setSpacing(20);
+    qtwSettings.addTab(&qNetworkWidget, tr("Network profiles"));
+    
+}
+
+void Settings::createDocumentTab() {
+    qDocumentWidget.setLayout(&layoutDocumentV);
+    layoutDocumentV.addLayout(&layoutDocumentH);
+
+    lwDocumentProfiles.addItem("Standard Profil");
+    layoutDocumentH.addWidget(&lwDocumentProfiles);
+
+    cbLanguage.addItem("Deutsch");
+    cbLanguage.addItem("English");
+    layoutDocumentForm.addRow(tr("Language: "), &cbLanguage);
+    sbResolution.setRange(150, 1200);
+    layoutDocumentForm.addRow(tr("Resolution: "), &sbResolution);
+
+    cbThresholdMethod.addItem("autoThreshold");
+    cbThresholdMethod.addItem("adaptiveThreshold");
+    cbThresholdMethod.addItem("Threshold");
+    layoutDocumentForm.addRow(tr("Threshold method: "), &cbThresholdMethod);
+    sbThresholdValue.setDecimals(3);
+    sbThresholdValue.setRange(0.001, 0.999);
+    sbThresholdValue.setSingleStep(0.001);
+    sbThresholdValue.setValue(0.993);
+    layoutDocumentForm.addRow(tr("Threshold value: "), &sbThresholdValue);
+    layoutDocumentH.addLayout(&layoutDocumentForm);
+
+    pbAddDocumentProfile.setText(tr("&Add"));
+    layoutDocumentButtons.addWidget(&pbAddDocumentProfile);
+    pbRemoveDocumentProfile.setText(tr("&Remove"));
+    layoutDocumentButtons.addWidget(&pbRemoveDocumentProfile);
+    pbSetDefaultDocumentProfile.setText(tr("Set &Default"));
+    layoutDocumentButtons.addWidget(&pbSetDefaultDocumentProfile);
+    layoutDocumentButtons.setEnabled(false);
+    layoutDocumentH.setSpacing(20);
+    layoutDocumentV.addLayout(&layoutDocumentButtons);
+    qtwSettings.addTab(&qDocumentWidget, tr("Document profiles"));
+}
+
+void Settings::createPathTab() {
+    qPathWidget.setLayout(&layoutPath);
+    layoutPath.addWidget(&lblDestinationDir, 0, 0);
+    layoutPath.addWidget(&leDestinationDir, 0, 1);
+    btDestinationDir.setText("...");
+    layoutPath.addWidget(&btDestinationDir, 0, 2);
+
+    layoutPath.addWidget(&lblSSHDir, 1, 0);
+    layoutPath.addWidget(&leSSHDir, 1, 1);
+    btSSHDir.setText("...");
+    layoutPath.addWidget(&btSSHDir, 1, 2);
+
+    qtwSettings.addTab(&qPathWidget, tr("Path settings"));
+}
+
+void Settings::showDialog() {
+    qdSettings.exec();
+}
+
+/* Settings::Settings(QWidget *parent) : QWidget(parent) {
     tabWidget.addTab(&netWorkTab, tr("Network profiles"));
     tabWidget.addTab(&documentTab, tr("Document profiles"));
     tabWidget.addTab(&pathTab, tr("Path settings"));
@@ -61,8 +168,8 @@ void Settings::AddNetworkProfile() {
 
 void Settings::DeleteNetworkProfile() {
 
-/*     m_deletedNetworkProfile.name = results[0];
-    m_deletedNetworkProfile.url = url; */
+     m_deletedNetworkProfile.name = results[0];
+    m_deletedNetworkProfile.url = url;
 }
 
 void Settings::SetDefaultNetworkProfile() {
@@ -96,7 +203,7 @@ void Settings::DeleteDocumentProfile() {
 
 void Settings::SetDefaultDocumentProfile() {
     
-}
+} 
 
 ProfileDialog::ProfileDialog (std::vector<Scan2ocr::s_ProfileElement> profiles, QWidget *parentWidget) : QWidget() {
     qProfileWidget = parentWidget;
@@ -197,4 +304,4 @@ std::string SetProfileElement::getInput() {
 
 void SetProfileElement::reject() {
     
-}
+}*/

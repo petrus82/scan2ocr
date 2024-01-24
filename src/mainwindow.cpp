@@ -66,7 +66,7 @@ void MainWindow::createMenu() {
     toolBar.addAction(&openPathAction);
 
     networkProfileMenu = fileMenu->addMenu(tr("FTP &Server"));
-
+/* 
     addProfileAction.setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
     addProfileAction.setStatusTip(tr("Add FTP server profiles."));
     connect(&addProfileAction, SIGNAL(triggered()), this, SLOT(addProfile()));
@@ -83,10 +83,10 @@ void MainWindow::createMenu() {
     networkProfileMenu->addAction(&defaultProfileAction);
     networkProfileMenu->addSeparator();
     
-    // Get all network profile entries and create a menu entry for each of them
-    for (auto &it : getNetworkProfiles()) {
+ */    // Get all network profile entries and create a menu entry for each of them
+/*     for (auto &it : getNetworkProfiles()) {
         createNetworkMenuEntry(*it);
-    }
+    } */
 
     fileMenu->addSeparator();
     toolBar.addSeparator();
@@ -176,7 +176,7 @@ void MainWindow::createOtherWidgets() {
     
 }
 
-void MainWindow::createNetworkMenuEntry(MainWindow::s_networkProfile &netProfile) {
+/* void MainWindow::createNetworkMenuEntry(MainWindow::s_networkProfile &netProfile) {
         ParseUrl &Url {netProfile.url};
         const std::string profileName {netProfile.name};
 
@@ -203,7 +203,7 @@ void MainWindow::createNetworkMenuEntry(MainWindow::s_networkProfile &netProfile
             // Add Profile to ComboBox
             cbNetworkProfiles->addItem(profileName.c_str());
         }
-}
+} */
 
 void MainWindow::setTabOrder() {
 
@@ -222,7 +222,7 @@ void MainWindow::setText() {
     pbDestinationDir.setText("...");
 }
 
-std::vector<std::unique_ptr<MainWindow::s_networkProfile>> MainWindow::getNetworkProfiles() {
+/* std::vector<std::unique_ptr<MainWindow::s_networkProfile>> MainWindow::getNetworkProfiles() {
     // Return a vector with std::unique_ptr's to Url's of all network profile entries
     std::vector<std::unique_ptr<s_networkProfile>> networkProfiles;
 
@@ -241,8 +241,8 @@ std::vector<std::unique_ptr<MainWindow::s_networkProfile>> MainWindow::getNetwor
     settings.endGroup();
     return networkProfiles;
 }
-
-void MainWindow::addProfile() {
+ */
+/* void MainWindow::addProfile() {
     // Display dialog to add new profile
     Scan2ocr::s_networkProfile networkProfile {settings.addNetworkProfile()};
 
@@ -250,8 +250,8 @@ void MainWindow::addProfile() {
         createNetworkMenuEntry(networkProfile);
     }
 }
-
-void MainWindow::deleteProfile() {
+ */
+/* void MainWindow::deleteProfile() {
     QDialog dialogDelete;
     QHBoxLayout layout(&dialogDelete);
     QPushButton pbOK;
@@ -285,10 +285,10 @@ void MainWindow::deleteProfile() {
     disconnect(&dialogDelete, SIGNAL(accepted()), &dialogDelete, SLOT(accept()));
     disconnect(&dialogDelete, SIGNAL(rejected()), &dialogDelete, SLOT(reject()));
 }
-
+ *//* 
 void MainWindow::defaultProfile () {
     
-}
+} */
 
 void MainWindow::settings() {
     /*
@@ -304,7 +304,12 @@ void MainWindow::settings() {
         - threshhold method
         - threshhold value
     */
+   Settings settingsDialog;
+
+   settingsDialog.showDialog();
 }
+
+
 
 void MainWindow::about() {
     QDialog aboutDialog;

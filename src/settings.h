@@ -1,3 +1,5 @@
+#pragma once
+
 #include "parseurl.h"
 #include "scan2ocr.h"
 #include <QObject>
@@ -6,9 +8,13 @@
 #include <QEvent>
 #include <QDialog>
 #include <QLayout>
+#include <QFormLayout>
 #include <QPushButton>
+#include <QToolButton>
 #include <QDialogButtonBox>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QSpinBox>
 #include <QComboBox>
 #include <QLabel>
 #include <QSettings>
@@ -60,49 +66,112 @@ class Settings : public QWidget
 {
     Q_OBJECT
 public:
+    enum class ThresholdMethod {
+        autoThreshold,
+        adaptiveThreshold,
+        threshold
+    };
+
+    enum class Language {
+        deu,
+        eng
+    };
+
+    struct s_networkProfile {
+        std::string name;
+        ParseUrl url;
+    };
+
+    struct s_documentProfile {
+        Language language {Language::deu};
+        int resolution {600};
+        ThresholdMethod thresholdMethod {ThresholdMethod::autoThreshold};
+        float thresholdValue {0.993};
+    };
+
+    struct s_ProfileElement {
+        std::string Element;
+        bool isNumerical;
+        bool isRequired;
+    };
+
     explicit Settings(QWidget *parent = nullptr);
-    ~Settings();
+    //~Settings();
 
-    Scan2ocr::s_networkProfile addedNetworkProfile() {
-        return m_addedNetworkProfile;
-    }
+    std::vector<std::string> NetworkProfiles();
+    std::vector<std::string> DocumentProfiles();
+    std::string DestinationDir();
+    std::string SSHKeyPath();
 
-    Scan2ocr::s_networkProfile deletedNetworkProfile() {
-        return m_deletedNetworkProfile;
-    }
+    std::string TmpDir() {
+        return std::filesystem::temp_directory_path().string() + "/";
+    };
 
-    Scan2ocr::s_networkProfile defaultNetworkProfile() {
-        return m_defaultNetworkProfile;
-    }
-    //std::vector<std::string> NetworkProfiles();
+    // Construct UI
+    void createNetworkTab();
+    void createDocumentTab();
+    void createPathTab();
 
-    //std::string DestinationDirectory() const;
-    //void DestinationDirectory(const std::string &destinationDirectory);
-
-    //std::vector<std::string> DocumentProfiles();
+    void showDialog();
 
 private slots:
 
 private:
+    const std::string m_inputDir {QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0).toStdString().c_str()};
+    const std::string m_sshPrivateKeyPath = inputDir + ".ssh/";
+    
+    //UI
+    QDialog qdSettings {this};
+    QVBoxLayout layoutDialog {&qdSettings};
+    QTabWidget qtwSettings;
+    QDialogButtonBox buttonBox;
 
-    QTabWidget tabWidget;
-    QWidget netWorkTab;
-    QWidget pathTab;
-    QWidget documentTab;
+    // Network Tab
+    QWidget qNetworkWidget {&qtwSettings};
+    QVBoxLayout layoutNetworkV {&qNetworkWidget};
+    QHBoxLayout layoutNetworkH {&qNetworkWidget};
+    QFormLayout layoutNetworkForm;
+    clickableLineEdit leHost;
+    QSpinBox sbPort;
+    clickableLineEdit leDirectory;
+    clickableLineEdit leUsername;
+    clickableLineEdit lePassword;
+    QListWidget lwNetworkProfiles;
 
-    void AddNetworkProfile();
-    Scan2ocr::s_networkProfile m_addedNetworkProfile;
-    void DeleteNetworkProfile();
-    Scan2ocr::s_networkProfile m_deletedNetworkProfile;
-    void SetDefaultNetworkProfile();
-    Scan2ocr::s_networkProfile m_defaultNetworkProfile;
+    QHBoxLayout layoutNetworkButtons;
+    QPushButton pbAdd;
+    QPushButton pbRemove;
+    QPushButton pbSetDefault;
 
-    void AddDocumentProfile();
-    void DeleteDocumentProfile();
-    void SetDefaultDocumentProfile();
+    // Document Tab
+    QWidget qDocumentWidget {&qtwSettings};
+    QVBoxLayout layoutDocumentV {&qDocumentWidget};
+    QHBoxLayout layoutDocumentH {&qDocumentWidget};
+    QFormLayout layoutDocumentForm;
+    QComboBox cbLanguage;
+    QSpinBox sbResolution;
+    QComboBox cbThresholdMethod;
+    QDoubleSpinBox sbThresholdValue;
+    QListWidget lwDocumentProfiles;
+
+    QHBoxLayout layoutDocumentButtons;
+    QPushButton pbAddDocumentProfile;
+    QPushButton pbRemoveDocumentProfile;
+    QPushButton pbSetDefaultDocumentProfile;
+
+    // Path Tab
+    QWidget qPathWidget {&qtwSettings};
+    QGridLayout layoutPath {&qPathWidget};
+    QLabel lblDestinationDir {tr("Destination directory:")};
+    QLineEdit leDestinationDir;
+    QLabel lblSSHDir {tr("SSH key path:")};
+    QLineEdit leSSHDir;
+    QToolButton btDestinationDir;
+    QToolButton btSSHDir;
+
 };
 
-class ProfileDialog : public QWidget {
+/* class ProfileDialog : public QWidget {
 
     Q_OBJECT
 public:
@@ -147,4 +216,4 @@ private:
     QGridLayout layout {&qWidget};
     QComboBox cbElement;
     QDialogButtonBox buttonBox {QDialogButtonBox::Ok | QDialogButtonBox::Cancel};
-};
+}; */

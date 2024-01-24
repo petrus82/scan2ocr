@@ -40,11 +40,13 @@ set(SOURCE_FILES
   src/scan2ocr.cpp
   src/ftpconnection.cpp
   src/parseurl.cpp
+  src/settings.cpp
   src/mainwindow.h
   src/pdffile.h
   src/ftpconnection.h
   src/parseurl.h
   src/scan2ocr.h
+  src/settings.h
 )
 
 qt_add_executable(scan2ocr  

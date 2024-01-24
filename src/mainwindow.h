@@ -2,6 +2,8 @@
 
 #include "pdffile.h"
 #include "parseurl.h"
+#include "settings.h"
+
 #include <QObject>
 #include <QFileDialog>
 #include <QtCore/QVariant>
@@ -49,9 +51,9 @@ private slots:
     void openFile();
     void openPath();
     void openNetwork();
-    void addProfile();
-    void deleteProfile();
-    void defaultProfile();
+    //void addProfile();
+    //void deleteProfile();
+    //void defaultProfile();
     void settings();
     void cancel();
     void about();
@@ -60,9 +62,9 @@ private slots:
 private:
 
     void createMenu();
-    void createNetworkMenuEntry (Scan2ocr::s_networkProfile &netProfile);
+    //void createNetworkMenuEntry (Scan2ocr::s_networkProfile &netProfile);
     void createOtherWidgets();
-    std::vector<std::unique_ptr<s_networkProfile>> getNetworkProfiles();
+    //std::vector<std::unique_ptr<s_networkProfile>> getNetworkProfiles();
     void setTabOrder();
     void setText();
     void connectSignals();
@@ -104,7 +106,6 @@ private:
     const std::string defaultTextDirectory {""}; //{leDirectory->text().toStdString()};
     
     PdfFileList *pdfFileList {nullptr};
-    Settings settings;
 };
 
 QT_END_NAMESPACE
