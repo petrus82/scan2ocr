@@ -165,6 +165,8 @@ void SettingsUI::createNetworkTab() {
     layoutNetworkButtons.addWidget(&pbSetDefault);
     QObject::connect(&pbSetDefault, &QPushButton::clicked, this, &SettingsUI::setDefaultNetworkProfile);
     layoutNetworkButtons.setEnabled(false);
+    pbRemove.setStyleSheet("color: gray;");
+    pbSetDefault.setStyleSheet("color: gray;");
     pbAdd.setEnabled(true);
 
     layoutNetworkV.addLayout(&layoutNetworkButtons);
@@ -177,6 +179,9 @@ void SettingsUI::createNetworkTab() {
     QObject::connect(&leDirectory, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
     QObject::connect(&leUsername, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
     QObject::connect(&lePassword, &QLineEdit::textChanged, this, &SettingsUI::updateVector);    
+
+    // Load network profiles
+    setNetworkProfiles();
 }
 
 void SettingsUI::setNetworkProfiles() {
@@ -201,6 +206,26 @@ void SettingsUI::setNetworkProfiles() {
 }
 
 void SettingsUI::changedNetworkProfile(int currentRow) {
+    if (currentRow < 0) {
+        // No profile selected
+        // Disable remove and setDefault buttons and set there text color to white
+        pbRemove.setEnabled(false);
+        pbSetDefault.setEnabled(false);
+        pbRemove.setStyleSheet("color: gray;");
+        pbSetDefault.setStyleSheet("color: gray;");
+        return;
+    }
+
+    // Update profile name
+    networkProfiles.at(currentRow).name = lwNetworkProfiles.currentItem()->text().toStdString();
+
+    // Enable remove and setDefault buttons
+    pbRemove.setEnabled(true);
+    pbSetDefault.setEnabled(true);
+    pbRemove.setStyleSheet("color: black;");
+    pbSetDefault.setStyleSheet("color: black;");
+
+    // Load the corresponding profile
     leHost.setText(QString::fromStdString(networkProfiles[currentRow].url.Host()));
     sbPort.setValue(networkProfiles[currentRow].url.Port());
     leDirectory.setText(QString::fromStdString(networkProfiles[currentRow].url.Directory()));
@@ -211,29 +236,36 @@ void SettingsUI::changedNetworkProfile(int currentRow) {
 void SettingsUI::addNetworkProfile() {
 
     // Create a new element
-    lwNetworkProfiles.addItem("");
-    QListWidgetItem* lastItem = lwNetworkProfiles.item(lwNetworkProfiles.count() - 1);
-    lwNetworkProfiles.setCurrentItem(lastItem);
-    lwNetworkProfiles.editItem(lastItem);
+    QListWidgetItem *addedItem = new QListWidgetItem;       // Memory management by QListWidget, so new may be safe
+    addedItem->setFlags(Qt::ItemIsEditable|Qt::ItemIsSelectable|Qt::ItemIsEnabled);
+    lwNetworkProfiles.addItem(addedItem);
+    lwNetworkProfiles.editItem(addedItem);
     layoutNetworkButtons.setEnabled(true);
 
     // Add networkProfile vector element with default entries
-        
     networkProfiles.emplace_back(Settings::s_networkProfile{
         "defaultname",
         false,
-        ParseUrl{"sftp://defaultHost/defaultDirectory"}}
+        ParseUrl{"sftp://Hostname:22/Directory/"}}
     );
+
+    // If it is the first profile, make it default
+    if (networkProfiles.size() == 1) {
+        networkProfiles.at(0).isDefault = true;
+        lwNetworkProfiles.item(0)->setFont(QFont("", -1, QFont::Bold));
+    }
 }
 
 void SettingsUI::removeNetworkProfile() {
     int indexElement {lwNetworkProfiles.currentRow()};
+    if (indexElement < 0) {
+        // No profile selected
+        return;
+    }
     if (!lwNetworkProfiles.currentItem()->text().isEmpty()) {
         networkProfiles.erase(networkProfiles.begin() + indexElement);
         lwNetworkProfiles.takeItem(indexElement);
-        networkProfiles.erase(networkProfiles.begin() + indexElement);
     }
-    
 }
 
 void SettingsUI::setDefaultNetworkProfile() {
@@ -256,32 +288,35 @@ void SettingsUI::setDefaultNetworkProfile() {
 }
 
 bool SettingsUI::validateNetworkProfile() {
-
-    // Make sure that there is no empty profile name
-    QListWidgetItem *item {lwNetworkProfiles.currentItem()};
-    if (item != nullptr) {
-        if (!item->text().isEmpty()) {
-            // Check if the user has forgotten to enter a name,
-            // that would be the case if leHost, leDirectory, leUsername or lePassword contain an input
-            if (leHost.text().isEmpty() || leDirectory.text().isEmpty() || leUsername.text().isEmpty() || lePassword.text().isEmpty()) {
-                // There is no user input, so the current item can just be deleted
-                delete item;
-            } else {
-                // there is some input, so the profile should have a name
-                QMessageBox::warning(this, tr("Error"), tr("Please enter a profile name"));
-                return false;
-            }     
-        } else {
-            // The profile has a name, now we should check if it has all required entries
-            if (leHost.text().isEmpty()) {
-                QMessageBox::warning(this, tr("Error"), tr("Please enter a hostname"));
-                return false;
-            } else if (leDirectory.text().isEmpty()) {
-                QMessageBox::warning(this, tr("Error"), tr("Please enter a directory"));
-                return false;
+    int profileNumber {1};
+    for (auto it=networkProfiles.begin(); it != networkProfiles.end(); it++) {
+        if ((*it).name == "defaultname") {
+            int result = QMessageBox::warning(this, tr("Error"), tr("Default profile name for profile no° ") + QString::number(profileNumber) +
+            ". Do you want to delete it?", QMessageBox::Yes | QMessageBox::No
+            );
+            if (result == QMessageBox::Yes) {
+                delete lwNetworkProfiles.item(profileNumber-1);
+                networkProfiles.erase(it);
+                // Try again
+                return validateNetworkProfile();
             }
-        } 
-    }
+            return false;
+        }
+        if ((*it).url.Host() == "Hostname") {
+            QMessageBox::warning(this, tr("Error"), tr("Default hostname for profile ") + QString::fromStdString((*it).name + "."));
+            return false;
+        }
+        if ((*it).url.Directory() == "/Directory/") {
+            QMessageBox::warning(this, tr("Error"), tr("Empty directory for profile ") + QString::fromStdString((*it).name + "."));
+            return false;
+        }
+        // Make sure the directory entry is terminated with a "/"
+        std::string directory {(*it).url.Directory()};
+        if (directory.substr(directory.length()-1, 1) != "/") {
+            (*it).url.Directory(directory + "/");
+        };
+        profileNumber++;
+    } 
     // There is either no profile entry or it has a name and all required entries
     return true;
 }
@@ -318,16 +353,25 @@ void SettingsUI::createDocumentTab() {
     layoutDocumentButtons.addWidget(&pbRemoveDocumentProfile);
     pbSetDefaultDocumentProfile.setText(tr("Set &Default"));
     layoutDocumentButtons.addWidget(&pbSetDefaultDocumentProfile);
+
     layoutDocumentButtons.setEnabled(false);
+    pbRemoveDocumentProfile.setStyleSheet("color: gray");
+    pbSetDefaultDocumentProfile.setStyleSheet("color: gray");
+    pbAddDocumentProfile.setEnabled(true);
+
     layoutDocumentH.setSpacing(20);
     layoutDocumentV.addLayout(&layoutDocumentButtons);
     qtwSettings.addTab(&qDocumentWidget, tr("Document profiles"));
 
     // Connect Signals of documentProfile widgets
+    QObject::connect(&lwDocumentProfiles, &QListWidget::currentRowChanged, this, &SettingsUI::updateVector);
     QObject::connect(&cbLanguage, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsUI::updateVector);
     QObject::connect(&sbResolution, QOverload<int>::of(&QSpinBox::valueChanged), this, &SettingsUI::updateVector);
     QObject::connect(&cbThresholdMethod, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsUI::updateVector);
     QObject::connect(&sbThresholdValue, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &SettingsUI::updateVector);
+
+    // Load document profiles
+    setDocumentProfiles();
 }
 
 void SettingsUI::setStepValue(int newValue) {
@@ -361,10 +405,11 @@ void SettingsUI::setDocumentProfiles() {
 }
 
 void SettingsUI::addDocumentProfile() {
-    lwDocumentProfiles.addItem("");
-    QListWidgetItem* lastItem = lwDocumentProfiles.item(lwDocumentProfiles.count() - 1);
-    lwDocumentProfiles.setCurrentItem(lastItem);
-    lwDocumentProfiles.editItem(lastItem);
+    // Create a new element
+    QListWidgetItem *addedItem = new QListWidgetItem;       // Memory management by QListWidget, so new may be safe
+    addedItem->setFlags(Qt::ItemIsEditable|Qt::ItemIsSelectable|Qt::ItemIsEnabled);
+    lwDocumentProfiles.addItem(addedItem);
+    lwDocumentProfiles.editItem(addedItem);
     layoutDocumentButtons.setEnabled(true);
 
     // Add documentProfile vector element with default entries
@@ -376,14 +421,23 @@ void SettingsUI::addDocumentProfile() {
         Settings::ThresholdMethod::autoThreshold,
         0.993}
     );
+
+    // If it is the first profile, make it the active one
+    if (documentProfiles.size() == 1) {
+        documentProfiles.at(0).isActive = true;
+        lwDocumentProfiles.item(0)->setFont(QFont("", -1, QFont::Bold));
+    }
 }
 
 void SettingsUI::removeDocumentProfile() {
     int indexElement {lwDocumentProfiles.currentRow()};
+    if (indexElement < 0) {
+        // No element selected
+        return;
+    }
     if (!lwDocumentProfiles.currentItem()->text().isEmpty()) {
         documentProfiles.erase(documentProfiles.begin() + indexElement);
         lwDocumentProfiles.takeItem(indexElement);
-        documentProfiles.erase(documentProfiles.begin() + indexElement);
     }
 }
 
@@ -407,18 +461,36 @@ void SettingsUI::setDefaultDocumentProfile() {
 }
 
 void SettingsUI::changedDocumentProfile(int index) {
+    documentProfiles.at(index).name = lwDocumentProfiles.currentItem()->text().toStdString();
     cbLanguage.setCurrentIndex(index);
     sbResolution.setValue(documentProfiles.at(index).resolution);
     cbThresholdMethod.setCurrentIndex(static_cast<int>(documentProfiles.at(index).thresholdMethod));
     sbThresholdValue.setValue(documentProfiles.at(index).thresholdValue);
 }
 
-void SettingsUI::validateDocumentProfile() {
-    // Check if the profile name is empty, if so it should be deleted
-    if (lwDocumentProfiles.currentItem()->text().isEmpty()) {
-        // The user has not entered a name, we should delete the profile
-        documentProfiles.erase(documentProfiles.begin() + lwDocumentProfiles.currentRow());
-    };
+bool SettingsUI::validateDocumentProfile() {
+    int profileNumber {0};
+    for (auto it = documentProfiles.begin(); it != documentProfiles.end(); it++) {
+        // Check if the profile name is empty, if so it should be deleted
+        qDebug() << (*it).name;
+        if ((*it).name == "defaultname") {
+            // The user has not entered a name, maybe the profile should be deleted
+            int result = QMessageBox::warning(
+                this, tr("Error"), 
+                tr("Default document profile name for profile nr° ") + 
+                QString::number(profileNumber) +
+                tr(". Do you want to delete it?"), 
+                QMessageBox::Yes | QMessageBox::No
+            );
+            if (result == QMessageBox::Yes) {
+                documentProfiles.erase(it);
+                return true;    
+            }
+            return false;            
+        };    
+        profileNumber++;
+    }
+    return true;
 }
 
 bool SettingsUI::validatePath(const QString Path) {
@@ -471,32 +543,36 @@ void SettingsUI::updateVector() {
     int profileIndexNetwork {lwNetworkProfiles.currentRow()};
     int profileIndexDocument {lwDocumentProfiles.currentRow()};
 
-    if (senderObject == &leHost) {
-        networkProfiles[profileIndexNetwork].url.Host(leHost.text().toStdString());
+    if(profileIndexNetwork>=0) {
+        if (senderObject == &leHost) {
+            networkProfiles[profileIndexNetwork].url.Host(leHost.text().toStdString());
+        }
+        else if (senderObject == &sbPort) {
+            networkProfiles[profileIndexNetwork].url.Port(sbPort.value());
+        }
+        else if (senderObject == &leDirectory) {
+            networkProfiles[profileIndexNetwork].url.Directory(leDirectory.text().toStdString());
+        }
+        else if (senderObject == &leUsername) {
+            networkProfiles[profileIndexNetwork].url.Username(leUsername.text().toStdString());
+        }
+        else if (senderObject == &lePassword) {
+            networkProfiles[profileIndexNetwork].url.Password(lePassword.text().toStdString());
+        }
     }
-    else if (senderObject == &sbPort) {
-        networkProfiles[profileIndexNetwork].url.Port(sbPort.value());
-    }
-    else if (senderObject == &leDirectory) {
-        networkProfiles[profileIndexNetwork].url.Directory(leDirectory.text().toStdString());
-    }
-    else if (senderObject == &leUsername) {
-        networkProfiles[profileIndexNetwork].url.Username(leUsername.text().toStdString());
-    }
-    else if (senderObject == &lePassword) {
-        networkProfiles[profileIndexNetwork].url.Password(lePassword.text().toStdString());
-    }
-    else if (senderObject == &cbLanguage) {
-        documentProfiles[profileIndexDocument].language = static_cast<Settings::Language>(cbLanguage.currentIndex());
-    }
-    else if (senderObject == &sbResolution) {
-        documentProfiles[profileIndexDocument].resolution = sbResolution.value();
-    }
-    else if (senderObject == &cbThresholdMethod) {
-        documentProfiles[profileIndexDocument].thresholdMethod = static_cast<Settings::ThresholdMethod>(cbThresholdMethod.currentIndex());
-    }
-    else if (senderObject == &sbThresholdValue) {
-        documentProfiles[profileIndexDocument].thresholdValue = sbThresholdValue.value();
+    if (profileIndexDocument>=0) {
+        if (senderObject == &cbLanguage) {
+            documentProfiles[profileIndexDocument].language = static_cast<Settings::Language>(cbLanguage.currentIndex());
+        }
+        else if (senderObject == &sbResolution) {
+            documentProfiles[profileIndexDocument].resolution = sbResolution.value();
+        }
+        else if (senderObject == &cbThresholdMethod) {
+            documentProfiles[profileIndexDocument].thresholdMethod = static_cast<Settings::ThresholdMethod>(cbThresholdMethod.currentIndex());
+        }
+        else if (senderObject == &sbThresholdValue) {
+            documentProfiles[profileIndexDocument].thresholdValue = sbThresholdValue.value();
+        }
     }
 }
 void SettingsUI::showDialog() {
@@ -511,7 +587,7 @@ void SettingsUI::clickedOK() {
         - Non existing path names of leDestinationDir and leSSHDir should be excluded
     */
     if (!validateNetworkProfile()) return;
-    validateDocumentProfile();
+    if (!validateDocumentProfile()) return;
     if (!validatePath(leDestinationDir.text())) return;
     if (!validatePath(leSSHDir.text())) return;
 
@@ -519,6 +595,7 @@ void SettingsUI::clickedOK() {
 }
 
 void SettingsUI::accepted() {
+    settings.clear();
     // Save settings
     // NetworkProfiles
     settings.beginGroup("NetworkProfiles");
@@ -534,7 +611,7 @@ void SettingsUI::accepted() {
     settings.beginGroup("DocumentProfiles");
     for (auto &profile : documentProfiles) {
         settings.beginGroup(profile.name);
-        settings.setValue("isDefault", profile.isActive);
+        settings.setValue("isActive", profile.isActive);
         settings.setValue("language", static_cast<int>(profile.language));
         settings.setValue("resolution", profile.resolution);
         settings.setValue("thresholdMethod", static_cast<int>(profile.thresholdMethod));

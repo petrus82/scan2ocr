@@ -158,9 +158,9 @@ private:
     QDialogButtonBox buttonBox;
 
     // Network Tab
-    QWidget qNetworkWidget {&qtwSettings};
+    QWidget qNetworkWidget{&qtwSettings};
     QVBoxLayout layoutNetworkV {&qNetworkWidget};
-    QHBoxLayout layoutNetworkH {&qNetworkWidget};
+    QHBoxLayout layoutNetworkH;
     QFormLayout layoutNetworkForm;
 
     QLineEdit leHost;
@@ -182,7 +182,7 @@ private:
     // Document Tab
     QWidget qDocumentWidget {&qtwSettings};
     QVBoxLayout layoutDocumentV {&qDocumentWidget};
-    QHBoxLayout layoutDocumentH {&qDocumentWidget};
+    QHBoxLayout layoutDocumentH;
     QFormLayout layoutDocumentForm;
 
     QComboBox cbLanguage;
@@ -214,7 +214,7 @@ private:
 
     // Validator functions
     bool validateNetworkProfile();
-    void validateDocumentProfile();
+    bool validateDocumentProfile();
     bool validatePath(const QString Path);
 
     void accepted();

@@ -106,7 +106,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="216"/>
+        <location filename="src/mainwindow.cpp" line="226"/>
         <source>About Scan2OCR</source>
         <translation type="unfinished"></translation>
     </message>
@@ -126,63 +126,63 @@
         <translation>&amp;Umbenennen</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="336"/>
+        <location filename="src/mainwindow.cpp" line="353"/>
         <source>Open PDF file</source>
         <translation type="unfinished">PDF Datei öffnen</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="336"/>
+        <location filename="src/mainwindow.cpp" line="353"/>
         <source>PDF files *.pdf</source>
         <translation type="unfinished">PDF Dateien *.pdf</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="356"/>
+        <location filename="src/mainwindow.cpp" line="373"/>
         <source>Open directory</source>
         <translation type="unfinished">Verzeichnis öffnen</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="407"/>
+        <location filename="src/mainwindow.cpp" line="424"/>
         <source>Directory does not exist</source>
         <translation type="unfinished">Verzeichnis existiert nicht</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="407"/>
+        <location filename="src/mainwindow.cpp" line="424"/>
         <source>This directory does not exist. Do you want to create it?</source>
         <translation type="unfinished">Dieses Verzeichnis gibt es nicht. Wollen Sie es erstellen?</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="413"/>
+        <location filename="src/mainwindow.cpp" line="430"/>
         <source>Error while creating directory</source>
         <translation type="unfinished">Fehler bei der Verzeichnis Erstellung</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="426"/>
+        <location filename="src/mainwindow.cpp" line="443"/>
         <source>Overwrite file?</source>
         <translation type="unfinished">Datei überschreiben?</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="426"/>
+        <location filename="src/mainwindow.cpp" line="443"/>
         <source>This file already exists. Do you really want to overwrite </source>
         <translation type="unfinished">Datei bereits vorhanden. Wollen Sie </translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="426"/>
+        <location filename="src/mainwindow.cpp" line="443"/>
         <source> ?</source>
         <translation type="unfinished"> überschreiben?</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="445"/>
-        <location filename="src/mainwindow.cpp" line="448"/>
+        <location filename="src/mainwindow.cpp" line="462"/>
+        <location filename="src/mainwindow.cpp" line="465"/>
         <source>Error while renaming</source>
         <translation type="unfinished">Fehler beim Umbenennen</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="445"/>
+        <location filename="src/mainwindow.cpp" line="462"/>
         <source>This file cannot be renamed.</source>
         <translation type="unfinished">Die Datei konnte nicht umbenannt werden.</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="458"/>
+        <location filename="src/mainwindow.cpp" line="475"/>
         <source>Choose target directory</source>
         <translation type="unfinished">Zielverzeichnis auswählen</translation>
     </message>
@@ -239,7 +239,7 @@
     </message>
     <message>
         <location filename="src/settings.cpp" line="137"/>
-        <location filename="src/settings.cpp" line="172"/>
+        <location filename="src/settings.cpp" line="174"/>
         <source>Network profiles</source>
         <translation type="unfinished"></translation>
     </message>
@@ -270,91 +270,103 @@
     </message>
     <message>
         <location filename="src/settings.cpp" line="156"/>
-        <location filename="src/settings.cpp" line="315"/>
+        <location filename="src/settings.cpp" line="350"/>
         <source>&amp;Add</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="src/settings.cpp" line="160"/>
-        <location filename="src/settings.cpp" line="317"/>
+        <location filename="src/settings.cpp" line="352"/>
         <source>&amp;Remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="src/settings.cpp" line="164"/>
-        <location filename="src/settings.cpp" line="319"/>
+        <location filename="src/settings.cpp" line="354"/>
         <source>Set &amp;Default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="299"/>
+        <location filename="src/settings.cpp" line="294"/>
+        <source>Default profile name for profile no° </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/settings.cpp" line="306"/>
+        <source>Default hostname for profile </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/settings.cpp" line="310"/>
+        <source>Empty directory for profile </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/settings.cpp" line="334"/>
         <source>Language: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="302"/>
+        <location filename="src/settings.cpp" line="337"/>
         <source>Resolution: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="307"/>
+        <location filename="src/settings.cpp" line="342"/>
         <source>Threshold method: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="312"/>
+        <location filename="src/settings.cpp" line="347"/>
         <source>Threshold value: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="324"/>
+        <location filename="src/settings.cpp" line="364"/>
         <source>Document profiles</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="461"/>
-        <source>Path settings</source>
+        <location filename="src/settings.cpp" line="480"/>
+        <source>Default document profile name for profile nr° </source>
+        <oldsource>Empty document profile name for profile nr° </oldsource>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="271"/>
-        <location filename="src/settings.cpp" line="277"/>
-        <location filename="src/settings.cpp" line="280"/>
-        <location filename="src/settings.cpp" line="432"/>
-        <location filename="src/settings.cpp" line="436"/>
-        <source>Error</source>
-        <translation type="unfinished">Fehler</translation>
-    </message>
-    <message>
-        <location filename="src/settings.cpp" line="271"/>
-        <source>Please enter a profile name</source>
+        <location filename="src/settings.cpp" line="482"/>
+        <source>. Do you want to delete it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="277"/>
-        <source>Please enter a hostname</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="src/settings.cpp" line="280"/>
-        <source>Please enter a directory</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="src/settings.cpp" line="432"/>
-        <location filename="src/settings.cpp" line="436"/>
+        <location filename="src/settings.cpp" line="504"/>
+        <location filename="src/settings.cpp" line="508"/>
         <source>The </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="432"/>
+        <location filename="src/settings.cpp" line="504"/>
         <source> directory does not exist. Do you want to create it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="436"/>
+        <location filename="src/settings.cpp" line="508"/>
         <source> directory could not be created</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/settings.cpp" line="533"/>
+        <source>Path settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="src/settings.cpp" line="294"/>
+        <location filename="src/settings.cpp" line="306"/>
+        <location filename="src/settings.cpp" line="310"/>
+        <location filename="src/settings.cpp" line="479"/>
+        <location filename="src/settings.cpp" line="504"/>
+        <location filename="src/settings.cpp" line="508"/>
+        <source>Error</source>
+        <translation type="unfinished">Fehler</translation>
     </message>
     <message>
         <location filename="src/settings.h" line="206"/>

@@ -208,6 +208,16 @@ void MainWindow::setText() {
 void MainWindow::settingsMenu() {
    SettingsUI settingsDialog;
    settingsDialog.showDialog();
+
+    //Update the networkMenu and the toolbar
+    // if we have a cbNetworkProfiles clear it
+    if (cbNetworkProfiles != nullptr) {
+        cbNetworkProfiles->clear();
+    }
+    networkProfileMenu->clear();
+    for (auto it : settings.getNetworkProfiles()) {
+        createNetworkMenuEntry(it);
+    }
 }
 
 void MainWindow::about() {
@@ -238,10 +248,17 @@ void MainWindow::about() {
 }
 
 void MainWindow::openNetwork() {
-    QAction *action = qobject_cast<QAction *>(sender());
-    if(action) {
-        QVariant profileData = action->data();
-        ParseUrl url = profileData.value<ParseUrl>();
+    QObject *senderObject = QObject::sender();
+
+    if (senderObject == cbNetworkProfiles.get()) {
+        int index = cbNetworkProfiles->currentIndex();
+        QAction *action = networkProfileMenu->actions()[index];
+        ParseUrl url = action->data().value<ParseUrl>();
+        
+        pdfFileList.addFiles(url);
+    }
+    else if (senderObject == networkProfileAction.get()) {
+        ParseUrl url = networkProfileAction->data().value<ParseUrl>();
         pdfFileList.addFiles(url);
     }
 }

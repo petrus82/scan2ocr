@@ -41,15 +41,15 @@ public:
     QUrl qUrl();
 
 private:
-    std::string m_url;
-    std::string scheme;
-    std::string host;
-    int port;
-    std::string username;
-    std::string password;
-    std::string directory;
-    std::string filename;
-    std::string rawFilename;
+    std::string m_url {""};
+    std::string scheme {""};
+    std::string host {""};
+    int port {0};
+    std::string username {""};
+    std::string password {""};
+    std::string directory {""};
+    std::string filename {""};
+    std::string rawFilename {""};
 };
 
 #endif

@@ -85,6 +85,7 @@ target_compile_options(scan2ocr PRIVATE
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Add debug flags
   target_compile_options(scan2ocr PRIVATE -ggdb3)
+  add_compile_definitions(DEBUG)
 else()
   # Add flags for clean and stripped executable
   target_compile_options(scan2ocr PRIVATE -s -O3 -DNDEBUG)
