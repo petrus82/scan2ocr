@@ -18,20 +18,77 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QSettings>
+#include <QDir>
 #include <QMessageBox>
 
-class clickableLineEdit : public QLineEdit {
-    Q_OBJECT
+class Settings {
+
 public:
-    clickableLineEdit(QWidget *parent = nullptr) : QLineEdit(parent) {};
+    enum class ThresholdMethod {
+        autoThreshold,
+        adaptiveThreshold,
+        threshold
+    };
 
-    bool event (QEvent* ev) override;
+    enum class Language {
+        deu,
+        eng
+    };
 
-signals:
-    void clicked();
+    struct s_networkProfile {
+        std::string name;
+        bool isDefault;
+        ParseUrl url;
+    };
+
+    struct s_documentProfile {
+        std::string name;
+        bool isActive;
+        Language language {Language::deu};
+        int resolution {600};
+        ThresholdMethod thresholdMethod {ThresholdMethod::autoThreshold};
+        float thresholdValue {0.993};
+    };
+    Settings::s_documentProfile* activeDocumentProfile;
+
+    struct s_ProfileElement {
+        std::string Element;
+        bool isNumerical;
+        bool isRequired;
+    };
+
+    QSettings settings;
+
+    std::vector<Settings::s_networkProfile> getNetworkProfiles();
+    std::vector<Settings::s_documentProfile> getDocumentProfiles();
+
+    std::string getDestinationDir();
+
+    std::string getSSHKeyPath();
+
+    std::string TmpDir() {
+        return std::filesystem::temp_directory_path().string() + "/";
+    };
+
+    int resolution() { return activeDocumentProfile->resolution;}
+
+    std::string language() {
+        switch (activeDocumentProfile->language) {
+            case Language::deu:
+                return "deu";
+            case Language::eng:
+                return "eng";
+            default:
+                return "deu";
+        };
+    }
+
+    ThresholdMethod thresholdMethod() { return activeDocumentProfile->thresholdMethod; }
+    
+    float thresholdValue() { return activeDocumentProfile->thresholdValue; }
 };
 
-class Settings : public QWidget
+class SettingsUI : public QWidget, public Settings
 /*
     Class to manage program settings:
     - Tab Network profiles
@@ -66,61 +123,35 @@ class Settings : public QWidget
 {
     Q_OBJECT
 public:
-    enum class ThresholdMethod {
-        autoThreshold,
-        adaptiveThreshold,
-        threshold
-    };
 
-    enum class Language {
-        deu,
-        eng
-    };
+    explicit SettingsUI(QWidget *parent = nullptr);
+    void showDialog();
 
-    struct s_networkProfile {
-        std::string name;
-        ParseUrl url;
-    };
+private slots:
+    void clickedOK();
 
-    struct s_documentProfile {
-        Language language {Language::deu};
-        int resolution {600};
-        ThresholdMethod thresholdMethod {ThresholdMethod::autoThreshold};
-        float thresholdValue {0.993};
-    };
+    void addNetworkProfile();
+    void removeNetworkProfile();
+    void setDefaultNetworkProfile();
 
-    struct s_ProfileElement {
-        std::string Element;
-        bool isNumerical;
-        bool isRequired;
-    };
+    void changedNetworkProfile(int currentRow);
 
-    explicit Settings(QWidget *parent = nullptr);
-    //~Settings();
+    void addDocumentProfile();
+    void removeDocumentProfile();
+    void setDefaultDocumentProfile();
 
-    std::vector<std::string> NetworkProfiles();
-    std::vector<std::string> DocumentProfiles();
-    std::string DestinationDir();
-    std::string SSHKeyPath();
+    void changedDocumentProfile(int currentRow);
 
-    std::string TmpDir() {
-        return std::filesystem::temp_directory_path().string() + "/";
-    };
+    void setStepValue(int value);
+    void updateVector();
 
-    // Construct UI
+private:
+    
+    //UI
     void createNetworkTab();
     void createDocumentTab();
     void createPathTab();
 
-    void showDialog();
-
-private slots:
-
-private:
-    const std::string m_inputDir {QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0).toStdString().c_str()};
-    const std::string m_sshPrivateKeyPath = inputDir + ".ssh/";
-    
-    //UI
     QDialog qdSettings {this};
     QVBoxLayout layoutDialog {&qdSettings};
     QTabWidget qtwSettings;
@@ -131,11 +162,13 @@ private:
     QVBoxLayout layoutNetworkV {&qNetworkWidget};
     QHBoxLayout layoutNetworkH {&qNetworkWidget};
     QFormLayout layoutNetworkForm;
-    clickableLineEdit leHost;
+
+    QLineEdit leHost;
     QSpinBox sbPort;
-    clickableLineEdit leDirectory;
-    clickableLineEdit leUsername;
-    clickableLineEdit lePassword;
+    QLineEdit leDirectory;
+    QLineEdit leUsername;
+    QLineEdit lePassword;
+    
     QListWidget lwNetworkProfiles;
 
     QHBoxLayout layoutNetworkButtons;
@@ -143,21 +176,29 @@ private:
     QPushButton pbRemove;
     QPushButton pbSetDefault;
 
+    std::vector<s_networkProfile> networkProfiles;
+    void setNetworkProfiles();
+
     // Document Tab
     QWidget qDocumentWidget {&qtwSettings};
     QVBoxLayout layoutDocumentV {&qDocumentWidget};
     QHBoxLayout layoutDocumentH {&qDocumentWidget};
     QFormLayout layoutDocumentForm;
+
     QComboBox cbLanguage;
     QSpinBox sbResolution;
     QComboBox cbThresholdMethod;
     QDoubleSpinBox sbThresholdValue;
+
     QListWidget lwDocumentProfiles;
 
     QHBoxLayout layoutDocumentButtons;
     QPushButton pbAddDocumentProfile;
     QPushButton pbRemoveDocumentProfile;
     QPushButton pbSetDefaultDocumentProfile;
+
+    std::vector<s_documentProfile> documentProfiles;
+    void setDocumentProfiles();
 
     // Path Tab
     QWidget qPathWidget {&qtwSettings};
@@ -169,51 +210,13 @@ private:
     QToolButton btDestinationDir;
     QToolButton btSSHDir;
 
+    void setPaths();
+
+    // Validator functions
+    bool validateNetworkProfile();
+    void validateDocumentProfile();
+    bool validatePath(const QString Path);
+
+    void accepted();
+
 };
-
-/* class ProfileDialog : public QWidget {
-
-    Q_OBJECT
-public:
-    ProfileDialog(std::vector <Scan2ocr::s_ProfileElement> profiles, QWidget *parentWidget = nullptr);
-    ~ProfileDialog();
-
-    std::vector<std::string> getInput();
-
-private slots:
-    void accept();
-    void reject();
-
-private:
-    QWidget *qProfileWidget {nullptr};
-    QGridLayout layout {qProfileWidget};
-    
-    struct sProfileElement {
-        QLabel lblProfile;
-        clickableLineEdit leProfile;
-        bool isNumerical {false};
-        bool isRequired {false};
-    };
-
-    std::vector<std::unique_ptr<sProfileElement>> profileElements;
-};
-
-class SetProfileElement : public QWidget
-{
-    Q_OBJECT
-public:
-    SetProfileElement(std::string WidgetTitle, std::vector<std::string> Elements);
-    ~SetProfileElement();
-
-    std::string getInput();
-
-private slots:
-    void accept();
-    void reject();
-
-private:
-    QWidget qWidget;
-    QGridLayout layout {&qWidget};
-    QComboBox cbElement;
-    QDialogButtonBox buttonBox {QDialogButtonBox::Ok | QDialogButtonBox::Cancel};
-}; */

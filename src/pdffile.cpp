@@ -47,11 +47,6 @@ Its format is in the form /directory/filename
 */
 
 PdfFileList::~PdfFileList() {
-    for (auto pdfFile : pdfFiles) {
-        if (pdfFile != nullptr) {
-            delete pdfFile;
-        }
-    }
     pdfFiles.clear();
 }
 
@@ -70,8 +65,7 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
             maxStatus += c_statusIncrement;
             emit newFileAdded();
 
-            PdfFile* pdfFile = new PdfFile(Url, Url.FileDir(), m_Status);
-            pdfFiles.push_back(pdfFile);
+            pdfFiles.emplace_back(std::make_unique<PdfFile>(Url, Url.FileDir(), m_Status));
             emit newFileComplete(Url.Filename());
             
             emit finishedProcessing();
@@ -89,9 +83,7 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                     ParseUrl newUrl ("file://" + entry.path().string());
 
                     auto lambdaThread = [=]()-> void{
-                        PdfFile* pdfFile = new PdfFile (newUrl, newUrl.FileDir(), m_Status);
-                        pdfFiles.push_back(pdfFile);
-
+                        pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, newUrl.FileDir(), m_Status));
                         emit newFileComplete(entry.path().filename().string());
                     };
                     threads.push_back(std::thread(lambdaThread));
@@ -109,8 +101,7 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
             FtpConnection ftpConnection (Url);
 
             std::string filename = ftpConnection.getFile(Url.Filename(), Url.Directory());
-            PdfFile* pdfFile = new PdfFile(Url, filename, m_Status);
-            pdfFiles.push_back(pdfFile);
+            pdfFiles.emplace_back(std::make_unique<PdfFile>(Url, filename, m_Status));
             emit newFileComplete(Url.Filename());
 
             emit finishedProcessing();
@@ -157,8 +148,7 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                             ParseUrl newUrl(Url);
                             newUrl.Filename(filename);
                             newUrl.Directory(fileDirectory);
-                            PdfFile* pdfFile = new PdfFile(newUrl, tmpFileName, m_Status);
-                            pdfFiles.push_back(pdfFile);
+                            pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, tmpFileName, m_Status));
 
                             emit newFileComplete(filename);
                         };
@@ -199,8 +189,7 @@ bool PdfFileList::removeFile(int Element) {
         ftpConnection.deleteFile(Url.FileDir());
     }
 
-    // Delete instance of _pdfFile, remove from pdfFileList
-    delete pdfFiles[Element];
+    // remove from pdfFileList
     pdfFiles.erase(pdfFiles.begin() + Element);
     return true;
 }
@@ -222,7 +211,8 @@ PdfFile::PdfFile(ParseUrl Url, const std::string &localCopy, int &status, QObjec
     
     // Read PdfFile into Memory
     Magick::ReadOptions options;
-    options.density(Magick::Geometry(600, 600));        // Set Resolution of input image to 600 dpi
+    int resolution {settings.resolution()};
+    options.density(Magick::Geometry(resolution, resolution));        // Set Resolution of input image to 600 dpi
     Magick::readImages(&pdfImgList, m_LocalCopy, options);
     
     status++;
@@ -249,7 +239,7 @@ bool PdfFile::removeEmptyPage() {
         Magick::ImageStatistics Statistics = image.statistics();
         double mean_val = Statistics.channel(MagickCore::PixelChannel()).mean();
         mean_val /= 1 << 16;
-        if (mean_val > Threshold)
+        if (mean_val > settings.thresholdValue())
         {
             it = pdfImgList.erase(it);
         }
@@ -263,7 +253,19 @@ bool PdfFile::transcodeToTiff() {
     for (auto &image : pdfImgList)
     {
         // Turn into black and white image
-        image.autoThreshold(MagickCore::AutoThresholdMethod::OTSUThresholdMethod);
+        switch (settings.thresholdMethod()) {
+        case Settings::ThresholdMethod::autoThreshold:
+            image.autoThreshold(MagickCore::AutoThresholdMethod::OTSUThresholdMethod);
+            break;
+        case Settings::ThresholdMethod::adaptiveThreshold:
+            image.adaptiveThreshold(10,10, 2);
+            break;
+        case Settings::ThresholdMethod::threshold:
+            image.threshold(settings.thresholdValue());
+            break;
+        default:
+            break;
+        }
 
         // Change encoding to Tiff G4
         image.magick("TIFF");
@@ -274,7 +276,7 @@ bool PdfFile::transcodeToTiff() {
 
 bool PdfFile::ocrPdf() {
     tesseract::TessBaseAPI ocr;
-    ocr.Init(NULL, Language, tesseract::OEM_LSTM_ONLY);
+    ocr.Init(NULL, settings.language().c_str(), tesseract::OEM_LSTM_ONLY);
 
     // Tesseract always adds .pdf to the file name
     // To have the output of tesseract into m_tempFileName remove the .pdf from m_tempFileName

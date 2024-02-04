@@ -1,16 +1,119 @@
 #include "settings.h"
 
-bool clickableLineEdit::event (QEvent* ev) {
-    if (ev->type() == QEvent::MouseButtonPress) {
-        emit clicked();
-        return true;
-    }
+/**************************************class Settings*****************************************
+ * 
+ * Returns the saved profile values using QSettings, if no settings are saved yet, return
+ * the default values
+ *
+ */
 
-    // Make sure the rest of events are handled
-    return QWidget::event(ev);
+std::vector<Settings::s_networkProfile> Settings::getNetworkProfiles() {
+    settings.beginGroup("NetworkProfiles");
+    
+    QStringList profileKeys = settings.childGroups();
+    std::vector<Settings::s_networkProfile> networkProfiles;
+
+    for (const auto &profile : profileKeys) {
+        settings.beginGroup(profile);
+    
+        networkProfiles.emplace_back(Settings::s_networkProfile{
+            profile.toStdString(),
+            settings.value("isDefault").toBool(), 
+            ParseUrl(settings.value("url").toString().toStdString())
+            }
+        );
+    
+        settings.endGroup();
+    }
+    settings.endGroup();
+    
+    return networkProfiles;
 }
 
-Settings::Settings (QWidget *parent) : QWidget(parent) {
+std::vector<Settings::s_documentProfile> Settings::getDocumentProfiles() {
+    settings.beginGroup("DocumentProfiles");
+    
+    
+    QStringList profileKeys = settings.childGroups();
+    std::vector<s_documentProfile> documentProfiles;
+
+    for (const auto &profile : profileKeys) {
+        settings.beginGroup(profile);
+
+        documentProfiles.emplace_back(Settings::s_documentProfile{
+            profile.toStdString(),
+            settings.value("isActive").toBool(),
+            static_cast<Settings::Language>(settings.value("language").toInt()),
+            settings.value("resolution").toInt(),
+            static_cast<Settings::ThresholdMethod>(settings.value("thresholdMethod").toInt()),
+            settings.value("thresholdValue").toFloat()
+            }
+        );
+        if (documentProfiles.back().isActive) {
+            activeDocumentProfile = &documentProfiles.back();
+        }
+        settings.endGroup();
+    }
+    settings.endGroup();
+
+    if (documentProfiles.empty()) {
+        documentProfiles.emplace_back(Settings::s_documentProfile{
+            "default",
+            false,
+            Settings::Language::deu,
+            600,
+            Settings::ThresholdMethod::autoThreshold,
+            0.993
+            }
+        );
+        activeDocumentProfile = &documentProfiles.back();
+    }
+    return documentProfiles;
+}
+
+std::string Settings::getDestinationDir() {
+    settings.beginGroup("Path");
+    QString destinationDir {settings.value("DestinationDir").toString()};
+    settings.endGroup();
+
+    if (destinationDir.isEmpty()) {
+        destinationDir = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0);
+    }
+    return destinationDir.toStdString();
+}
+
+std::string Settings::getSSHKeyPath() {
+    settings.beginGroup("Path");
+    QString sshKeyPath {settings.value("SSHKeyPath").toString()};
+    settings.endGroup();
+
+    if (sshKeyPath.isEmpty()) {
+        sshKeyPath = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0) + ".ssh/";
+    }
+    return sshKeyPath.toStdString();
+}
+
+/********************************** class SettingsUI **********************************
+* In the constructor the overall layout is created
+*
+* createNetworkTab, createDocumentTab and createPathTab implement the logic of the corresponding tabs
+*
+* If the dialog is closed with the Ok button, the user input is checked in 
+* validateNetworkProfile, validateDocumentProfile and validatePath, if that succeeds,
+* accepted is called which saves the settings using QSettings with the profile names as subgroups
+*
+* The addNetworkProfile or addDocumentProfile functions create a new entry in the ListWidget and 
+* add's a new element to the private profile vector variable (networkProfiles or documentProfiles)
+* with default entries. Each time a the text of an entry has been edited, the updateVector function is
+* called which updates the private vector variables
+*
+* The remove functions clear the ListWidget items and update the private vector variable
+*
+* The setDefault functions set the font to normal of the previous default entry and
+* set the font to bold of the new default entry
+*/
+
+SettingsUI::SettingsUI (QWidget *parent) : QWidget(parent) {
     qdSettings.setWindowTitle(tr("Settings"));
     qdSettings.setMinimumSize(600, 400);
     qtwSettings.setParent(&qdSettings);
@@ -21,21 +124,23 @@ Settings::Settings (QWidget *parent) : QWidget(parent) {
     createPathTab();
     
     layoutDialog.addWidget(&qtwSettings);
-    buttonBox.setStandardButtons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel | QDialogButtonBox::Apply);
-    buttonBox.button(QDialogButtonBox::Apply)->setEnabled(false);
+    buttonBox.setStandardButtons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     layoutDialog.addWidget(&buttonBox);
     layoutDialog.setAlignment(Qt::AlignRight);
+
+    QObject::connect(&buttonBox, &QDialogButtonBox::accepted, this, &SettingsUI::clickedOK);
+    QObject::connect(&buttonBox, &QDialogButtonBox::rejected, &qdSettings, &QDialog::reject);
+    QObject::connect(&qdSettings,  &QDialog::accepted, this, &SettingsUI::accepted);
 }
 
-void Settings::createNetworkTab() {
+void SettingsUI::createNetworkTab() {
     qtwSettings.setTabText(0, tr("Network profiles"));
 
     qNetworkWidget.setLayout(&layoutNetworkV);
     layoutNetworkV.addLayout(&layoutNetworkH);
     
-    lwNetworkProfiles.addItem("boettger-r farbe");
-    lwNetworkProfiles.addItem("boettger-r grau");
     layoutNetworkH.addWidget(&lwNetworkProfiles);
+    QObject::connect(&lwNetworkProfiles, &QListWidget::currentRowChanged, this, &SettingsUI::changedNetworkProfile);
 
     layoutNetworkForm.addRow(tr("Host: "), &leHost);
     sbPort.setRange(1, 65535);
@@ -50,29 +155,150 @@ void Settings::createNetworkTab() {
 
     pbAdd.setText(tr("&Add"));
     layoutNetworkButtons.addWidget(&pbAdd);
+    QObject::connect(&pbAdd,  &QPushButton::clicked, this, &SettingsUI::addNetworkProfile);
+
     pbRemove.setText(tr("&Remove"));
     layoutNetworkButtons.addWidget(&pbRemove);
+    QObject::connect(&pbRemove, &QPushButton::clicked, this, &SettingsUI::removeNetworkProfile);
+
     pbSetDefault.setText(tr("Set &Default"));
     layoutNetworkButtons.addWidget(&pbSetDefault);
+    QObject::connect(&pbSetDefault, &QPushButton::clicked, this, &SettingsUI::setDefaultNetworkProfile);
     layoutNetworkButtons.setEnabled(false);
+    pbAdd.setEnabled(true);
 
     layoutNetworkV.addLayout(&layoutNetworkButtons);
     layoutNetworkH.setSpacing(20);
     qtwSettings.addTab(&qNetworkWidget, tr("Network profiles"));
+
+    // Connect Signals of networkProfile widgets
+        QObject::connect(&leHost, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
+    QObject::connect(&sbPort, &QSpinBox::valueChanged, this, &SettingsUI::updateVector);
+    QObject::connect(&leDirectory, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
+    QObject::connect(&leUsername, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
+    QObject::connect(&lePassword, &QLineEdit::textChanged, this, &SettingsUI::updateVector);    
+}
+
+void SettingsUI::setNetworkProfiles() {
+    for (auto& profile : getNetworkProfiles()) {
+        lwNetworkProfiles.addItem(QString::fromStdString(profile.name));
+        networkProfiles.emplace_back(Settings::s_networkProfile{
+            profile.name,
+            profile.isDefault,
+            profile.url}
+        );
+
+        if (profile.isDefault) {    
+            // Set the font to bold of the last added item
+            lwNetworkProfiles.item(lwNetworkProfiles.count() - 1)->setFont(QFont("", -1, QFont::Bold));
+            leHost.setText(QString::fromStdString(profile.url.Host()));
+            sbPort.setValue(profile.url.Port());
+            leDirectory.setText(QString::fromStdString(profile.url.Directory()));
+            leUsername.setText(QString::fromStdString(profile.url.Username()));
+            lePassword.setText(QString::fromStdString(profile.url.Password()));
+        }
+    }
+}
+
+void SettingsUI::changedNetworkProfile(int currentRow) {
+    leHost.setText(QString::fromStdString(networkProfiles[currentRow].url.Host()));
+    sbPort.setValue(networkProfiles[currentRow].url.Port());
+    leDirectory.setText(QString::fromStdString(networkProfiles[currentRow].url.Directory()));
+    leUsername.setText(QString::fromStdString(networkProfiles[currentRow].url.Username()));
+    lePassword.setText(QString::fromStdString(networkProfiles[currentRow].url.Password()));
+}
+
+void SettingsUI::addNetworkProfile() {
+
+    // Create a new element
+    lwNetworkProfiles.addItem("");
+    QListWidgetItem* lastItem = lwNetworkProfiles.item(lwNetworkProfiles.count() - 1);
+    lwNetworkProfiles.setCurrentItem(lastItem);
+    lwNetworkProfiles.editItem(lastItem);
+    layoutNetworkButtons.setEnabled(true);
+
+    // Add networkProfile vector element with default entries
+        
+    networkProfiles.emplace_back(Settings::s_networkProfile{
+        "defaultname",
+        false,
+        ParseUrl{"sftp://defaultHost/defaultDirectory"}}
+    );
+}
+
+void SettingsUI::removeNetworkProfile() {
+    int indexElement {lwNetworkProfiles.currentRow()};
+    if (!lwNetworkProfiles.currentItem()->text().isEmpty()) {
+        networkProfiles.erase(networkProfiles.begin() + indexElement);
+        lwNetworkProfiles.takeItem(indexElement);
+        networkProfiles.erase(networkProfiles.begin() + indexElement);
+    }
     
 }
 
-void Settings::createDocumentTab() {
+void SettingsUI::setDefaultNetworkProfile() {
+    if (lwNetworkProfiles.currentItem() != nullptr) {
+        // New default element
+        int defaultNr {lwNetworkProfiles.currentRow()};
+
+        // Remove the old default
+        for (int i=0; i< lwNetworkProfiles.count(); i++) {
+            if (lwNetworkProfiles.item(i) ->font().bold()) {
+                lwNetworkProfiles.item(i)->setFont(QFont("", -1));
+                networkProfiles.at(i).isDefault = false;
+            }
+        }
+
+        // Set new default
+        networkProfiles.at(defaultNr).isDefault = true;
+        lwNetworkProfiles.item(defaultNr)->setFont(QFont("", -1, QFont::Bold));
+    }
+}
+
+bool SettingsUI::validateNetworkProfile() {
+
+    // Make sure that there is no empty profile name
+    QListWidgetItem *item {lwNetworkProfiles.currentItem()};
+    if (item != nullptr) {
+        if (!item->text().isEmpty()) {
+            // Check if the user has forgotten to enter a name,
+            // that would be the case if leHost, leDirectory, leUsername or lePassword contain an input
+            if (leHost.text().isEmpty() || leDirectory.text().isEmpty() || leUsername.text().isEmpty() || lePassword.text().isEmpty()) {
+                // There is no user input, so the current item can just be deleted
+                delete item;
+            } else {
+                // there is some input, so the profile should have a name
+                QMessageBox::warning(this, tr("Error"), tr("Please enter a profile name"));
+                return false;
+            }     
+        } else {
+            // The profile has a name, now we should check if it has all required entries
+            if (leHost.text().isEmpty()) {
+                QMessageBox::warning(this, tr("Error"), tr("Please enter a hostname"));
+                return false;
+            } else if (leDirectory.text().isEmpty()) {
+                QMessageBox::warning(this, tr("Error"), tr("Please enter a directory"));
+                return false;
+            }
+        } 
+    }
+    // There is either no profile entry or it has a name and all required entries
+    return true;
+}
+
+
+void SettingsUI::createDocumentTab() {
     qDocumentWidget.setLayout(&layoutDocumentV);
     layoutDocumentV.addLayout(&layoutDocumentH);
 
-    lwDocumentProfiles.addItem("Standard Profil");
     layoutDocumentH.addWidget(&lwDocumentProfiles);
+    QObject::connect(&lwDocumentProfiles, &QListWidget::currentRowChanged, this, &SettingsUI::changedDocumentProfile);
 
     cbLanguage.addItem("Deutsch");
     cbLanguage.addItem("English");
     layoutDocumentForm.addRow(tr("Language: "), &cbLanguage);
     sbResolution.setRange(150, 1200);
+    QObject::connect(&sbResolution, &QSpinBox::valueChanged, this, &SettingsUI::setStepValue);
     layoutDocumentForm.addRow(tr("Resolution: "), &sbResolution);
 
     cbThresholdMethod.addItem("autoThreshold");
@@ -96,9 +322,131 @@ void Settings::createDocumentTab() {
     layoutDocumentH.setSpacing(20);
     layoutDocumentV.addLayout(&layoutDocumentButtons);
     qtwSettings.addTab(&qDocumentWidget, tr("Document profiles"));
+
+    // Connect Signals of documentProfile widgets
+    QObject::connect(&cbLanguage, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsUI::updateVector);
+    QObject::connect(&sbResolution, QOverload<int>::of(&QSpinBox::valueChanged), this, &SettingsUI::updateVector);
+    QObject::connect(&cbThresholdMethod, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsUI::updateVector);
+    QObject::connect(&sbThresholdValue, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &SettingsUI::updateVector);
 }
 
-void Settings::createPathTab() {
+void SettingsUI::setStepValue(int newValue) {
+    // value should only take 150 - 300 - 600 - 1200
+    static int previousValue = newValue;
+    int diff = newValue - previousValue;
+
+    if (diff > 0) {
+        // It has been incremented, so double the SingleStep value
+        sbResolution.setSingleStep(sbResolution.singleStep() * 2);
+    } else if (diff < 0) {
+        // It has been decremented, so halve the SingleStep value
+        sbResolution.setSingleStep(sbResolution.singleStep() / 2);
+    }
+
+    // Store the current value as the previous value for the next change
+    previousValue = newValue;
+}
+void SettingsUI::setDocumentProfiles() {
+    for (auto& profile : getDocumentProfiles()) {
+        lwDocumentProfiles.addItem(QString::fromStdString(profile.name));
+        if (profile.isActive) {    
+            // Set the font to bold of the last added item
+            lwDocumentProfiles.item(lwDocumentProfiles.count() - 1)->setFont(QFont("", -1, QFont::Bold));
+            cbLanguage.setCurrentIndex(static_cast<int>(profile.language));
+            sbResolution.setValue(profile.resolution);
+            cbThresholdMethod.setCurrentIndex(static_cast<int>(profile.thresholdMethod));
+            sbThresholdValue.setValue(profile.thresholdValue);
+        }
+    }
+}
+
+void SettingsUI::addDocumentProfile() {
+    lwDocumentProfiles.addItem("");
+    QListWidgetItem* lastItem = lwDocumentProfiles.item(lwDocumentProfiles.count() - 1);
+    lwDocumentProfiles.setCurrentItem(lastItem);
+    lwDocumentProfiles.editItem(lastItem);
+    layoutDocumentButtons.setEnabled(true);
+
+    // Add documentProfile vector element with default entries
+    documentProfiles.emplace_back(Settings::s_documentProfile{
+        "defaultname",
+        false,
+        Settings::Language::deu,
+        600,
+        Settings::ThresholdMethod::autoThreshold,
+        0.993}
+    );
+}
+
+void SettingsUI::removeDocumentProfile() {
+    int indexElement {lwDocumentProfiles.currentRow()};
+    if (!lwDocumentProfiles.currentItem()->text().isEmpty()) {
+        documentProfiles.erase(documentProfiles.begin() + indexElement);
+        lwDocumentProfiles.takeItem(indexElement);
+        documentProfiles.erase(documentProfiles.begin() + indexElement);
+    }
+}
+
+void SettingsUI::setDefaultDocumentProfile() {
+    if (lwDocumentProfiles.currentItem() != nullptr) {
+        // New default element
+        int defaultNr {lwDocumentProfiles.currentRow()};
+
+        // Remove the old default
+        for (int i=0; i< lwDocumentProfiles.count(); i++) {
+            if (lwDocumentProfiles.item(i) ->font().bold()) {
+                lwDocumentProfiles.item(i)->setFont(QFont("", -1));
+                documentProfiles.at(i).isActive = false;
+            }
+        }
+
+        // Set new default
+        documentProfiles.at(defaultNr).isActive = true;
+        lwDocumentProfiles.item(defaultNr)->setFont(QFont("", -1, QFont::Bold));
+    }
+}
+
+void SettingsUI::changedDocumentProfile(int index) {
+    cbLanguage.setCurrentIndex(index);
+    sbResolution.setValue(documentProfiles.at(index).resolution);
+    cbThresholdMethod.setCurrentIndex(static_cast<int>(documentProfiles.at(index).thresholdMethod));
+    sbThresholdValue.setValue(documentProfiles.at(index).thresholdValue);
+}
+
+void SettingsUI::validateDocumentProfile() {
+    // Check if the profile name is empty, if so it should be deleted
+    if (lwDocumentProfiles.currentItem()->text().isEmpty()) {
+        // The user has not entered a name, we should delete the profile
+        documentProfiles.erase(documentProfiles.begin() + lwDocumentProfiles.currentRow());
+    };
+}
+
+bool SettingsUI::validatePath(const QString Path) {
+    // Empty Path -> no modification, so return true
+    if (Path.isEmpty()) {
+        return true;
+    }
+
+    QDir directory(Path);
+    if (!directory.exists()){
+        int ret = QMessageBox::question(this, tr("Error"), tr("The ") + Path + tr(" directory does not exist. Do you want to create it?"), QMessageBox::Yes | QMessageBox::No);
+        if (ret == QMessageBox::Yes) {
+            int retVal = directory.mkpath(leDestinationDir.text());
+            if (retVal == false) {
+                QMessageBox::warning(this, tr("Error"), tr("The ") + Path + tr(" directory could not be created"));
+                return false;
+            }
+            return true;
+        }
+        else {
+            // No valid directory, the user wants to correct the path entry
+            return false;
+        }
+    }
+    return true;
+}
+
+void SettingsUI::createPathTab() {
     qPathWidget.setLayout(&layoutPath);
     layoutPath.addWidget(&lblDestinationDir, 0, 0);
     layoutPath.addWidget(&leDestinationDir, 0, 1);
@@ -113,195 +461,91 @@ void Settings::createPathTab() {
     qtwSettings.addTab(&qPathWidget, tr("Path settings"));
 }
 
-void Settings::showDialog() {
+void SettingsUI::setPaths() {
+    leDestinationDir.setText(QString::fromStdString(getDestinationDir()));
+    leSSHDir.setText(QString::fromStdString(getSSHKeyPath()));
+}
+
+void SettingsUI::updateVector() {
+    QObject *senderObject = QObject::sender();
+    int profileIndexNetwork {lwNetworkProfiles.currentRow()};
+    int profileIndexDocument {lwDocumentProfiles.currentRow()};
+
+    if (senderObject == &leHost) {
+        networkProfiles[profileIndexNetwork].url.Host(leHost.text().toStdString());
+    }
+    else if (senderObject == &sbPort) {
+        networkProfiles[profileIndexNetwork].url.Port(sbPort.value());
+    }
+    else if (senderObject == &leDirectory) {
+        networkProfiles[profileIndexNetwork].url.Directory(leDirectory.text().toStdString());
+    }
+    else if (senderObject == &leUsername) {
+        networkProfiles[profileIndexNetwork].url.Username(leUsername.text().toStdString());
+    }
+    else if (senderObject == &lePassword) {
+        networkProfiles[profileIndexNetwork].url.Password(lePassword.text().toStdString());
+    }
+    else if (senderObject == &cbLanguage) {
+        documentProfiles[profileIndexDocument].language = static_cast<Settings::Language>(cbLanguage.currentIndex());
+    }
+    else if (senderObject == &sbResolution) {
+        documentProfiles[profileIndexDocument].resolution = sbResolution.value();
+    }
+    else if (senderObject == &cbThresholdMethod) {
+        documentProfiles[profileIndexDocument].thresholdMethod = static_cast<Settings::ThresholdMethod>(cbThresholdMethod.currentIndex());
+    }
+    else if (senderObject == &sbThresholdValue) {
+        documentProfiles[profileIndexDocument].thresholdValue = sbThresholdValue.value();
+    }
+}
+void SettingsUI::showDialog() {
     qdSettings.exec();
 }
 
-/* Settings::Settings(QWidget *parent) : QWidget(parent) {
-    tabWidget.addTab(&netWorkTab, tr("Network profiles"));
-    tabWidget.addTab(&documentTab, tr("Document profiles"));
-    tabWidget.addTab(&pathTab, tr("Path settings"));
+void SettingsUI::clickedOK() {
+    /* Check user inputs:
+        - It could be that the user has clicked on add profile and
+          has not entered a profile name, in this case the empty lwNetworkProfile item should be removed
+        - The user has not entered  a hostname or directory for a profile name
+        - Non existing path names of leDestinationDir and leSSHDir should be excluded
+    */
+    if (!validateNetworkProfile()) return;
+    validateDocumentProfile();
+    if (!validatePath(leDestinationDir.text())) return;
+    if (!validatePath(leSSHDir.text())) return;
+
+    qdSettings.accept();
 }
-std::vector<std::string> Settings::NetworkProfiles() {
-    QSettings settings;
+
+void SettingsUI::accepted() {
+    // Save settings
+    // NetworkProfiles
     settings.beginGroup("NetworkProfiles");
-    QStringList profileKeys = settings.allKeys();
-    settings.endGroup();
-    std::vector<std::string> profiles;
-    for (auto &it : profileKeys) {
-        profiles.emplace_back(it.toStdString());
+    for (auto &profile : networkProfiles) {
+        settings.beginGroup(profile.name);
+        settings.setValue("isDefault", profile.isDefault);
+        settings.setValue("url", QString::fromStdString(profile.url.Url()));
+        settings.endGroup();
     }
-    return profiles;
-}
-
-void Settings::AddNetworkProfile() {
-
-    std::vector <Scan2ocr::s_ProfileElement> profiles;  
-    
-    // Elementname, isNumerical, isRequired
-    profiles.emplace_back (tr("Profilename: "), true, true);
-    profiles.emplace_back (tr("Host: "), false, true);
-    profiles.emplace_back (tr("Port: "), true, false);
-    profiles.emplace_back (tr("Username: "), false, false);
-    profiles.emplace_back (tr("Directory: "), false, true);
-    profiles.emplace_back (tr("Password: "), false, false);
-    ProfileDialog addDialog(profiles, &netWorkTab);
-
-    std::vector<std::string> results = addDialog.getInput();
-    ParseUrl url;
-    QSettings settings;
-    url.Scheme("sftp");
-    url.Host(results[1]);
-    url.Port(std::stoi(results[2]));
-    url.Directory(results[3]);
-    url.Username(results[4]);
-    url.Password(results[5]);
-
-    settings.beginGroup("NetworkProfiles");
-    QString keyName {QString::fromStdString(results[0])};
-    settings.setValue(keyName, url.qUrl());
     settings.endGroup();
 
-    m_addedNetworkProfile.name = results[0];
-    m_addedNetworkProfile.url = url;
-}
-
-void Settings::DeleteNetworkProfile() {
-
-     m_deletedNetworkProfile.name = results[0];
-    m_deletedNetworkProfile.url = url;
-}
-
-void Settings::SetDefaultNetworkProfile() {
-    
-}
-void Settings::AddDocumentProfile() {
-    std::vector <Scan2ocr::s_ProfileElement> profiles;
-
-    // Elementname, isNumerical, isRequired
-    profiles.emplace_back (tr("Profile name: "), true, true);
-    profiles.emplace_back (tr("Language: "), false, true);
-    profiles.emplace_back (tr("Resolution: "), true, true);
-    profiles.emplace_back (tr("Threshold method: "), true, true);
-    profiles.emplace_back (tr("Threshold value: "), true, true);
-    ProfileDialog addDialog(profiles, &documentTab);
-
-    std::vector<std::string> results = addDialog.getInput();
-    QSettings settings;
+    // Document Profiles
     settings.beginGroup("DocumentProfiles");
-    QString keyName {QString::fromStdString(results[0])};
-
-    for (int i=1; i<results.size(); i++) {
-        settings.setValue(keyName, QString::fromStdString(results[i]));
+    for (auto &profile : documentProfiles) {
+        settings.beginGroup(profile.name);
+        settings.setValue("isDefault", profile.isActive);
+        settings.setValue("language", static_cast<int>(profile.language));
+        settings.setValue("resolution", profile.resolution);
+        settings.setValue("thresholdMethod", static_cast<int>(profile.thresholdMethod));
+        settings.setValue("thresholdValue", profile.thresholdValue);
+        settings.endGroup();
     }
     settings.endGroup();
+
+    // Path
+    settings.beginGroup("Path");
+    settings.setValue("DestinationDir", leDestinationDir.text());
+    settings.setValue("SSHKeyPath", leSSHDir.text());
+    settings.endGroup();
 }
-
-void Settings::DeleteDocumentProfile() {
-    
-}
-
-void Settings::SetDefaultDocumentProfile() {
-    
-} 
-
-ProfileDialog::ProfileDialog (std::vector<Scan2ocr::s_ProfileElement> profiles, QWidget *parentWidget) : QWidget() {
-    qProfileWidget = parentWidget;
-    layout.setContentsMargins(20, 20, 20, 20);
-
-    for (const auto& profile : profiles) {
-        // Create a new sProfileElement instance for each profile using std::make_unique
-        auto newProfileElement = std::make_unique<sProfileElement>();
-        
-        // Initialize the QLabel and clickableLineEdit members of the newProfileElement
-        newProfileElement->lblProfile.setText(QString::fromStdString(profile.Element));
-        newProfileElement->isNumerical = profile.isNumerical;
-        newProfileElement->isRequired = profile.isRequired;
-
-        // Add the newProfileElement to the profileElements vector and the layout
-        profileElements.push_back(std::move(newProfileElement));
-        layout.addWidget(&profileElements.back()->lblProfile, profileElements.size(), 1);
-        layout.addWidget(&profileElements.back()->leProfile, profileElements.size(), 2);
-    }
-
-    QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    layout.addWidget(&buttonBox, profileElements.size() + 1, 1);
-
-    connect(&buttonBox, SIGNAL(accepted()), qProfileWidget, SLOT(accept()));
-    connect(&buttonBox, SIGNAL(rejected()), qProfileWidget, SLOT(reject()));
-}
-
-ProfileDialog::~ProfileDialog() {
-    disconnect(qProfileWidget, SIGNAL(accepted()), qProfileWidget, SLOT(accept()));
-    disconnect(qProfileWidget, SIGNAL(rejected()), qProfileWidget, SLOT(reject()));
-}
-
-std::vector<std::string> ProfileDialog::getInput() {
-    std::vector<std::string> input;
-
-    for (auto &it : profileElements) {
-        input.emplace_back(it->leProfile.text().toStdString());
-    }
-    return input;
-}
-
-void ProfileDialog::accept() {
-    // Check if numbers are valid numbers and all required fields are filled
-        for (auto &it : profileElements) {
-            if (it->isNumerical) {
-                try {
-                    std::stoi(it->leProfile.text().toStdString());
-                }   
-                catch (const std::invalid_argument& e) {
-                    QMessageBox::warning(this, tr("Error"), tr("Invalid ") + it->lblProfile.text() + tr(" number"));
-                    QPalette Color {Qt::red};
-                    it->lblProfile.setPalette(Color);
-                }
-            }
-            if (it->isRequired && it->leProfile.text().isEmpty()) {
-                QMessageBox::warning(this, tr("Error"), tr("Field ") + it->lblProfile.text() + tr(" is required"));
-                QPalette Color {Qt::red};
-                it->lblProfile.setPalette(Color);
-            }
-        }
-}
-
-void ProfileDialog::reject() {
-    
-}
-
-SetProfileElement::SetProfileElement(std::string DialogTitle, std::vector<std::string> Elements) : QWidget() {
-    QTabWidget *tabWidget = qobject_cast<QTabWidget*>(this->parentWidget());
-    if (tabWidget) {
-        int index = tabWidget->indexOf(this);
-        if (index != -1) {
-            tabWidget->setTabText(index, QString::fromStdString(DialogTitle));
-        }
-    }
-
-    for (auto &it : Elements) {
-        cbElement.addItem(QString::fromStdString(it));
-    }
-    layout.addWidget(&cbElement, 0, 0);
-    layout.addWidget(&buttonBox, 1, 0);
-
-    connect(&buttonBox, SIGNAL(accepted()), &qWidget, SLOT(accept()));
-    connect(&buttonBox, SIGNAL(rejected()), &qWidget, SLOT(reject()));
-}
-
-SetProfileElement::~SetProfileElement() {
-    disconnect(&qWidget, SIGNAL(accepted()), &qWidget, SLOT(accept()));
-    disconnect(&qWidget, SIGNAL(rejected()), &qWidget, SLOT(reject()));
-}
-
-void SetProfileElement::accept() {
-    
-}
-
-std::string SetProfileElement::getInput() {
-    return cbElement.currentText().toStdString();
-}
-
-void SetProfileElement::reject() {
-    
-}*/

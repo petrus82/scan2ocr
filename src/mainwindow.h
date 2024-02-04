@@ -51,10 +51,7 @@ private slots:
     void openFile();
     void openPath();
     void openNetwork();
-    //void addProfile();
-    //void deleteProfile();
-    //void defaultProfile();
-    void settings();
+    void settingsMenu();
     void cancel();
     void about();
     void deleteText ();
@@ -62,9 +59,8 @@ private slots:
 private:
 
     void createMenu();
-    //void createNetworkMenuEntry (Scan2ocr::s_networkProfile &netProfile);
+    void createNetworkMenuEntry (Settings::s_networkProfile &netProfile);
     void createOtherWidgets();
-    //std::vector<std::unique_ptr<s_networkProfile>> getNetworkProfiles();
     void setTabOrder();
     void setText();
     void connectSignals();
@@ -102,10 +98,11 @@ private:
     QCompleter completer;
 
     bool Modified(QLineEdit *LineEdit, const std::string Default);
-    const std::string defaultTextHost {""}; //{leHost->text().toStdString()};
-    const std::string defaultTextDirectory {""}; //{leDirectory->text().toStdString()};
+    const std::string defaultTextHost {""};
+    const std::string defaultTextDirectory {""};
     
-    PdfFileList *pdfFileList {nullptr};
+    PdfFileList &pdfFileList = PdfFileList::get_instance();
+    Settings settings;
 };
 
 QT_END_NAMESPACE

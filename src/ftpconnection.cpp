@@ -29,7 +29,8 @@ void FtpConnection::getConnection() {
         ssh_options_set(session, SSH_OPTIONS_PORT, &Port);
     }
 
-    ssh_options_set(session, SSH_OPTIONS_IDENTITY, sshPrivateKeyPath.c_str());
+    Settings settings;
+    ssh_options_set(session, SSH_OPTIONS_IDENTITY, settings.getSSHKeyPath().c_str());
 
     int rc = ssh_connect(session);
 
@@ -49,7 +50,7 @@ void FtpConnection::getConnection() {
     }
 
     // First try to authenticate with the server using ssh-keys
-    rc = ssh_userauth_publickey_auto(session, NULL, constants::sshPrivateKeyPath.c_str());
+    rc = ssh_userauth_publickey_auto(session, NULL, settings.getSSHKeyPath().c_str());
     if (rc != SSH_AUTH_SUCCESS) {
         // Authentication using keys failed, try user/password
         rc = ssh_userauth_password(session, NULL, ftpPassword.c_str());

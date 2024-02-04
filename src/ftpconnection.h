@@ -7,6 +7,7 @@
 #include <libssh/libssh.h>
 #include <libssh/sftp.h>
 #include "parseurl.h"
+#include "settings.h"
 #include "scan2ocr.h"
 
 class FtpConnection {

@@ -6,8 +6,7 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     
-    pdfFileList = &PdfFileList::get_instance();
-    pdfFileList->instance_cfMain(this);
+    pdfFileList.instance_cfMain(this);
     
     completer.setCaseSensitivity(Qt::CaseInsensitive);
     completer.setCompletionMode(QCompleter::PopupCompletion);
@@ -27,7 +26,7 @@ MainWindow::~MainWindow() {
     for (int i = metaObject->methodOffset(); i < metaObject->methodCount(); ++i) {
         QMetaMethod method = metaObject->method(i);
         if (method.methodType() == QMetaMethod::Signal) {
-            QObject::disconnect(nullptr, SIGNAL(method), this, SLOT(nullptr));
+            QObject::disconnect(nullptr, method.methodSignature().toStdString().c_str(), this, nullptr);
         }
     }
 }
@@ -54,39 +53,23 @@ void MainWindow::createMenu() {
     openFileAction.setShortcuts(QKeySequence::Open);
     openFileAction.setStatusTip(tr("Open a single PDF file from local disk."));
     openFileAction.setIcon(QIcon(":/images/file.png"));
-    connect(&openFileAction, SIGNAL(triggered()), this, SLOT(openFile())); 
+    QObject::connect(&openFileAction, &QAction::triggered, this, &MainWindow::openFile); 
     fileMenu->addAction(&openFileAction);
     toolBar.addAction(&openFileAction);
 
     openPathAction.setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
     openPathAction.setStatusTip(tr("Open a directory from local diskw."));
     openPathAction.setIcon(QIcon(":/images/directory.png"));
-    connect(&openPathAction, SIGNAL(triggered()), this, SLOT(openPath()));
+    QObject::connect(&openPathAction, &QAction::triggered, this, &MainWindow::openPath);
     fileMenu->addAction(&openPathAction);
     toolBar.addAction(&openPathAction);
 
     networkProfileMenu = fileMenu->addMenu(tr("FTP &Server"));
-/* 
-    addProfileAction.setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
-    addProfileAction.setStatusTip(tr("Add FTP server profiles."));
-    connect(&addProfileAction, SIGNAL(triggered()), this, SLOT(addProfile()));
-    networkProfileMenu->addAction(&addProfileAction);
 
-    deleteProfileAction.setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
-    deleteProfileAction.setStatusTip(tr("Delete FTP server profiles."));
-    connect(&deleteProfileAction, SIGNAL(triggered()), this, SLOT(deleteProfile()));
-    networkProfileMenu->addAction(&deleteProfileAction);
-    
-    defaultProfileAction.setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
-    defaultProfileAction.setStatusTip(tr("Set the default FTP server profile."));
-    connect(&defaultProfileAction, SIGNAL(triggered()), this, SLOT(defaultProfile()));
-    networkProfileMenu->addAction(&defaultProfileAction);
-    networkProfileMenu->addSeparator();
-    
- */    // Get all network profile entries and create a menu entry for each of them
-/*     for (auto &it : getNetworkProfiles()) {
-        createNetworkMenuEntry(*it);
-    } */
+   // Get all network profile entries and create a menu entry for each of them
+     for (auto it : settings.getNetworkProfiles()) {
+        createNetworkMenuEntry(it);
+    }
 
     fileMenu->addSeparator();
     toolBar.addSeparator();
@@ -94,14 +77,14 @@ void MainWindow::createMenu() {
     renameAction.setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
     renameAction.setIcon(QIcon(":/images/rename.png"));
     renameAction.setStatusTip(tr("Rename file to filename in destination directory."));
-    connect(&renameAction, SIGNAL(triggered()), this, SLOT(rename()));
+    QObject::connect(&renameAction, &QAction::triggered, this, &MainWindow::rename);
     fileMenu->addAction(&renameAction);
     toolBar.addAction(&renameAction);
 
     deleteAction.setShortcut(QKeySequence::Delete);
     deleteAction.setIcon(QIcon(":/images/delete.png"));
     deleteAction.setStatusTip(tr("Delete file."));
-    connect(&deleteAction, SIGNAL(triggered()), this, SLOT(deleteFileSlot()));
+    QObject::connect(&deleteAction, &QAction::triggered, this, &MainWindow::deleteFileSlot);
     fileMenu->addAction(&deleteAction);
     toolBar.addAction(&deleteAction);
 
@@ -109,21 +92,21 @@ void MainWindow::createMenu() {
     
     settingsAction.setShortcut(QKeySequence::Preferences);
     settingsAction.setStatusTip(tr("Settings."));
-    connect(&settingsAction, SIGNAL(triggered()), this, SLOT(settings()));
+    QObject::connect(&settingsAction, &QAction::triggered, this, &MainWindow::settingsMenu);
     fileMenu->addAction(&settingsAction);
 
     fileMenu->addSeparator();
-
+    
     cancelAction.setShortcut(QKeySequence::Quit);
     cancelAction.setStatusTip(tr("Quit."));
-    connect(&cancelAction, SIGNAL(triggered()), this, SLOT(cancel()));
+    QObject::connect(&cancelAction, &QAction::triggered, this, &MainWindow::cancel);
     fileMenu->addAction(&cancelAction);
 
     fileMenu->addSeparator();
 
     aboutAction.setShortcut(QKeySequence::HelpContents);
     aboutAction.setStatusTip(tr("About."));
-    connect(&aboutAction, SIGNAL(triggered()), this, SLOT(about()));
+    QObject::connect(&aboutAction, &QAction::triggered, this, &MainWindow::about);
     fileMenu->addAction(&aboutAction);
 }
 void MainWindow::createOtherWidgets() {
@@ -176,7 +159,7 @@ void MainWindow::createOtherWidgets() {
     
 }
 
-/* void MainWindow::createNetworkMenuEntry(MainWindow::s_networkProfile &netProfile) {
+void MainWindow::createNetworkMenuEntry(Settings::s_networkProfile &netProfile) {
         ParseUrl &Url {netProfile.url};
         const std::string profileName {netProfile.name};
 
@@ -186,7 +169,7 @@ void MainWindow::createOtherWidgets() {
         QVariant profileData = QVariant::fromValue(Url);
         networkProfileAction->setData(profileData);
         networkProfileMenu->addAction(networkProfileAction.get());
-        connect(networkProfileAction.get(), SIGNAL(triggered()), this, SLOT(openNetwork()));
+        connect(networkProfileAction.get(), &QAction::triggered, this, &MainWindow::openNetwork);
 
         // Now the toolbar
         if (cbNetworkProfiles == nullptr) {
@@ -197,13 +180,13 @@ void MainWindow::createOtherWidgets() {
             cbNetworkProfiles->setEditable(false);
             cbNetworkProfiles->setFixedWidth(250);
             toolBar.addWidget(cbNetworkProfiles.get());
-            connect(cbNetworkProfiles.get(), SIGNAL(clicked()), this, SLOT(openNetwork()));
+            connect(cbNetworkProfiles.get(), &QComboBox::activated, this, &MainWindow::openNetwork);
         } 
         else {
             // Add Profile to ComboBox
             cbNetworkProfiles->addItem(profileName.c_str());
         }
-} */
+}
 
 void MainWindow::setTabOrder() {
 
@@ -222,94 +205,10 @@ void MainWindow::setText() {
     pbDestinationDir.setText("...");
 }
 
-/* std::vector<std::unique_ptr<MainWindow::s_networkProfile>> MainWindow::getNetworkProfiles() {
-    // Return a vector with std::unique_ptr's to Url's of all network profile entries
-    std::vector<std::unique_ptr<s_networkProfile>> networkProfiles;
-
-    QSettings settings;
-    settings.beginGroup("NetworkProfiles");
-    
-        QStringList profileKeys = settings.allKeys();
-
-        for (auto &it : profileKeys) {
-            MainWindow::s_networkProfile setting; 
-            setting.url = settings.value(it).toString().toStdString();
-            setting.name = it.toStdString();
-
-            networkProfiles.emplace_back(std::make_unique<s_networkProfile>(setting));
-        }
-    settings.endGroup();
-    return networkProfiles;
-}
- */
-/* void MainWindow::addProfile() {
-    // Display dialog to add new profile
-    Scan2ocr::s_networkProfile networkProfile {settings.addNetworkProfile()};
-
-    if (networkProfile.name != "") {
-        createNetworkMenuEntry(networkProfile);
-    }
-}
- */
-/* void MainWindow::deleteProfile() {
-    QDialog dialogDelete;
-    QHBoxLayout layout(&dialogDelete);
-    QPushButton pbOK;
-    pbOK.setText(tr("&OK"));
-    pbOK.setFixedWidth(80);
-
-    QPushButton pbCancel;
-    pbCancel.setText(tr("&Cancel"));
-    pbCancel.setFixedWidth(80);
-
-    QComboBox cbProfiles {&dialogDelete};
-    for (auto &it : getNetworkProfiles()) {
-        cbProfiles.addItem(it->name.c_str());
-    }
-
-    layout.addWidget(&pbOK);
-    layout.addWidget(&pbCancel);
-
-    connect(&pbOK, SIGNAL(clicked()), &dialogDelete, SLOT(accept()));
-    connect(&pbCancel, SIGNAL(clicked()), &dialogDelete, SLOT(reject()));
-
-    dialogDelete.exec();
-
-    if (dialogDelete.result() == QDialog::Accepted) {
-        QSettings settings;
-        settings.beginGroup("NetworkProfiles");
-        settings.remove(cbProfiles.currentText());
-        settings.endGroup();
-    }
-
-    disconnect(&dialogDelete, SIGNAL(accepted()), &dialogDelete, SLOT(accept()));
-    disconnect(&dialogDelete, SIGNAL(rejected()), &dialogDelete, SLOT(reject()));
-}
- *//* 
-void MainWindow::defaultProfile () {
-    
-} */
-
-void MainWindow::settings() {
-    /*
-    Settings dialog:
-    - Networkprofiles
-        - Add
-        - Remove
-        - Set default
-    - Default destination directory
-    - Document Profiles
-        - language
-        - resolution
-        - threshhold method
-        - threshhold value
-    */
-   Settings settingsDialog;
-
+void MainWindow::settingsMenu() {
+   SettingsUI settingsDialog;
    settingsDialog.showDialog();
 }
-
-
 
 void MainWindow::about() {
     QDialog aboutDialog;
@@ -343,33 +242,41 @@ void MainWindow::openNetwork() {
     if(action) {
         QVariant profileData = action->data();
         ParseUrl url = profileData.value<ParseUrl>();
-        pdfFileList->addFiles(url);
+        pdfFileList.addFiles(url);
     }
 }
 void MainWindow::connectSignals() {
     // If a new file is found
-    QObject::connect(pdfFileList, SIGNAL(newFileAdded()), this, SLOT(setMaxProgress()), Qt::DirectConnection);  
+    QObject::connect(&pdfFileList.get_instance(), &PdfFileList::newFileAdded,
+                      this, &MainWindow::setMaxProgress, Qt::DirectConnection);  
 
     // If the file is processed
-    QObject::connect(pdfFileList, SIGNAL(newFileComplete(const std::string)), this, SLOT(newFile(const std::string)), Qt::DirectConnection);
+    QObject::connect(&pdfFileList.get_instance(), &PdfFileList::newFileComplete,
+                      this, &MainWindow::newFile);
 
     // After all files have been processed
-    QObject::connect(pdfFileList, SIGNAL(finishedProcessing()), this, SLOT(processFinished()));
+    QObject::connect(&pdfFileList.get_instance(), &PdfFileList::finishedProcessing,
+                      this, &MainWindow::processFinished);
 
     // If the user has selected a file
-    QObject::connect(&lsFiles, SIGNAL(itemSelectionChanged()), this, SLOT(fileSelected()));
+    QObject::connect(&lsFiles, &QListWidget::itemSelectionChanged,
+                      this, &MainWindow::fileSelected);
 
     // If the Rename button has been clicked
-    QObject::connect(&pbRename, SIGNAL(clicked()), this, SLOT(rename()));
+    QObject::connect(&pbRename, &QPushButton::clicked,
+                      this, &MainWindow::rename);
 
     // If enter has been pressed in the LineEdit leFileName
-    QObject::connect(&leFileName, SIGNAL(returnPressed()), this, SLOT(rename()));
+    QObject::connect(&leFileName, &QLineEdit::returnPressed,
+                      this, &MainWindow::rename);
 
     // If the user has clicked the button pbDestinationDir to open a QFileDialog
-    QObject::connect(&pbDestinationDir, SIGNAL(clicked()), this, SLOT(getDestinationDir()));
+    QObject::connect(&pbDestinationDir, &QPushButton::clicked,
+                      this, &MainWindow::getDestinationDir);
 
     // If the user has changed the text in the LineEdit leDestinationDir
-    QObject::connect(&leDestinationDir, SIGNAL(textChanged(const QString&)), this, SLOT(directoryCompleter(const QString&)));
+    QObject::connect(&leDestinationDir, &QLineEdit::textChanged,
+                      this, &MainWindow::directoryCompleter);
 
     // If the user has clicked the button pbDelete
     //QObject::connect(pbDelete, SIGNAL(clicked()), this, SLOT(deleteFileSlot()));
@@ -392,8 +299,8 @@ void MainWindow::fileSelected(){
     if (Index < 0) {
         return;
     }
-    leFileName.setText(QString::fromStdString(pdfFileList->pdfFile(Index)->possibleFileName()));
-    loadPdf(QString::fromStdString(pdfFileList->pdfFile(Index)->tempFileName()));
+    leFileName.setText(QString::fromStdString(pdfFileList.pdfFile(Index)->possibleFileName()));
+    loadPdf(QString::fromStdString(pdfFileList.pdfFile(Index)->tempFileName()));
     leFileName.setFocus();
 
     // Select the part of the filename after the date until file extension to make rename quicker
@@ -404,12 +311,12 @@ void MainWindow::fileSelected(){
 }
 
 void MainWindow::statusUpdate(){
-    pbProgress.setMaximum (pdfFileList->maxStatus);
-    pbProgress.setValue (pdfFileList->status());
+    pbProgress.setMaximum (pdfFileList.maxStatus);
+    pbProgress.setValue (pdfFileList.status());
 }
 
 void MainWindow::setMaxProgress(){
-    pbProgress.setMaximum (pdfFileList->maxStatus);
+    pbProgress.setMaximum (pdfFileList.maxStatus);
     pbProgress.show();
 }
 
@@ -426,7 +333,7 @@ void MainWindow::openFile(){
     QFileDialog FileDialog;
     QString File;
 
-    File = FileDialog.getOpenFileName(this, tr("Open PDF file"), QString::fromStdString(constants::inputDir), tr("PDF files *.pdf"));
+    File = FileDialog.getOpenFileName(this, tr("Open PDF file"), QString::fromStdString(settings.getDestinationDir()), tr("PDF files *.pdf"));
     if(File == ""){
         return;
     }
@@ -436,7 +343,7 @@ void MainWindow::openFile(){
     // Create new Url for the selected file
     ParseUrl url("file://" + File.toStdString());
     
-    if(pdfFileList->addFiles(url)){
+    if(pdfFileList.addFiles(url)){
         this->close();
     }
     else{
@@ -446,7 +353,7 @@ void MainWindow::openFile(){
 
 void MainWindow::openPath(){
     QFileDialog PathDialog;
-    QString PathName = PathDialog.getExistingDirectory(this, tr("Open directory"), QString::fromStdString(constants::inputDir));
+    QString PathName = PathDialog.getExistingDirectory(this, tr("Open directory"), QString::fromStdString(settings.getDestinationDir()));
     if(PathName == ""){
         return;
     }
@@ -457,7 +364,7 @@ void MainWindow::openPath(){
     url.Scheme ("file");
     url.Directory (PathName.toStdString());
 
-    if(pdfFileList->addFiles(url)){
+    if(pdfFileList.addFiles(url)){
         this->close();
     } else {
         this->setVisible(true);
@@ -471,10 +378,10 @@ void MainWindow::cancel(){
 
 void MainWindow::deleteFile (const int element) {
     // Disconnect SIGNAL statusChange
-    QObject::disconnect(pdfFileList->pdfFile(element), SIGNAL(statusChange()), this, SLOT(statusUpdate()));
+        QObject::disconnect(&(*pdfFileList.pdfFile(element)), &PdfFile::statusChange, this, &MainWindow::statusUpdate);
 
     // Remove scanned File
-    pdfFileList->removeFile(element);
+    pdfFileList.removeFile(element);
     
     // Remove the currently selected item from lsFiles
     lsFiles.takeItem(element);
@@ -511,7 +418,7 @@ void MainWindow::rename() {
     const int element {lsFiles.currentRow()};
 
     //Rename processed file to newFileName
-    std::filesystem::path oldName = pdfFileList->pdfFile(element)->tempFileName();
+    std::filesystem::path oldName = pdfFileList.pdfFile(element)->tempFileName();
     std::filesystem::path newName(destinationDir + leFileName.text().toStdString());
 
     if (std::filesystem::exists(newName)) {
@@ -548,7 +455,7 @@ void MainWindow::rename() {
 
 void MainWindow::getDestinationDir(){
     QFileDialog PathDialog;
-    QString destDir = PathDialog.getExistingDirectory(this, tr("Choose target directory"), QString::fromStdString(constants::inputDir));
+    QString destDir = PathDialog.getExistingDirectory(this, tr("Choose target directory"), QString::fromStdString(settings.getDestinationDir()));
     leDestinationDir.setText(destDir);
 }
 
