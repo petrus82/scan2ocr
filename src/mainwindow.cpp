@@ -5,7 +5,13 @@
 #include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
-    
+    this->setMinimumSize(800, 600);
+    // Try to read window geometry from settings
+    QSettings qSettings;
+    qSettings.beginGroup("WindowGeometry");
+    restoreGeometry(qSettings.value("geometry").toByteArray());
+    qSettings.endGroup();
+
     pdfFileList.instance_cfMain(this);
     
     completer.setCaseSensitivity(Qt::CaseInsensitive);
@@ -16,10 +22,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setText();
 
     leDestinationDir.setCompleter(&completer);
+    connectSignals();
 }
 
 MainWindow::~MainWindow() {
-
+    // Save window dimensions
+    QSettings qSettings;
+    qSettings.beginGroup("WindowGeometry");
+    qSettings.setValue("geometry", this->saveGeometry());
+    qSettings.endGroup();
+    
     // disconnect all SIGNALS
     const QMetaObject* metaObject = this->metaObject();
 
@@ -64,7 +76,7 @@ void MainWindow::createMenu() {
     fileMenu->addAction(&openPathAction);
     toolBar.addAction(&openPathAction);
 
-    networkProfileMenu = fileMenu->addMenu(tr("FTP &Server"));
+    networkProfileMenu = fileMenu->addMenu(tr("Remote &profiles"));
 
    // Get all network profile entries and create a menu entry for each of them
      for (auto it : settings.getNetworkProfiles()) {
@@ -113,7 +125,6 @@ void MainWindow::createOtherWidgets() {
     centralWidget.setLayout(&mainLayout);
     setCentralWidget(&centralWidget);
 
-    lsFiles.addItem("lsFiles");
     lsFiles.setMaximumWidth(400);
     leFileName.setMaximumWidth(240);
     
@@ -164,18 +175,20 @@ void MainWindow::createNetworkMenuEntry(Settings::s_networkProfile &netProfile) 
         const std::string profileName {netProfile.name};
 
         // Add Profile to NetworkProfileMenu
-        networkProfileAction = std::make_unique<QAction>(Url.Host().c_str(), this);
+        networkProfileAction = std::make_unique<QAction>(profileName.c_str(), this);
         networkProfileAction->setIcon(QIcon(":/images/network.png"));
         QVariant profileData = QVariant::fromValue(Url);
         networkProfileAction->setData(profileData);
         networkProfileMenu->addAction(networkProfileAction.get());
         connect(networkProfileAction.get(), &QAction::triggered, this, &MainWindow::openNetwork);
-
+        // TODO: 
+        // Save the index of the menu item also
+        
         // Now the toolbar
         if (cbNetworkProfiles == nullptr) {
             // First we have to initialize the combobox
             cbNetworkProfiles = std::make_unique<QComboBox>();
-            cbNetworkProfiles->addItem(profileName.c_str());
+            cbNetworkProfiles->addItem(profileName.c_str(), QVariant::fromValue(Url));
             cbNetworkProfiles->setItemIcon(0, QIcon(":/images/network.png"));
             cbNetworkProfiles->setEditable(false);
             cbNetworkProfiles->setFixedWidth(250);
@@ -490,7 +503,7 @@ void MainWindow::directoryCompleter(const QString &text) {
     }
     catch(const std::exception& e)
     {
-        // Mainly because directories won't be found if not the complete name has been typed in
+        // Mainly because directories won't be found if the complete path name hasn't yet been typed into leDestinationDir
         return;
     }
     completer.setModel(new QStringListModel(dirNames, &completer));

@@ -11,7 +11,6 @@ std::vector<Settings::s_networkProfile> Settings::getNetworkProfiles() {
     settings.beginGroup("NetworkProfiles");
     
     QStringList profileKeys = settings.childGroups();
-    std::vector<Settings::s_networkProfile> networkProfiles;
 
     for (const auto &profile : profileKeys) {
         settings.beginGroup(profile);
@@ -19,8 +18,8 @@ std::vector<Settings::s_networkProfile> Settings::getNetworkProfiles() {
         networkProfiles.emplace_back(Settings::s_networkProfile{
             profile.toStdString(),
             settings.value("isDefault").toBool(), 
-            ParseUrl(settings.value("url").toString().toStdString())
-            }
+            settings.value("documentProfileName").toString().toStdString(),
+            ParseUrl(settings.value("url").toString().toStdString())}
         );
     
         settings.endGroup();
@@ -35,7 +34,6 @@ std::vector<Settings::s_documentProfile> Settings::getDocumentProfiles() {
     
     
     QStringList profileKeys = settings.childGroups();
-    std::vector<s_documentProfile> documentProfiles;
 
     for (const auto &profile : profileKeys) {
         settings.beginGroup(profile);
@@ -45,12 +43,12 @@ std::vector<Settings::s_documentProfile> Settings::getDocumentProfiles() {
             settings.value("isActive").toBool(),
             static_cast<Settings::Language>(settings.value("language").toInt()),
             settings.value("resolution").toInt(),
-            static_cast<Settings::ThresholdMethod>(settings.value("thresholdMethod").toInt()),
-            settings.value("thresholdValue").toFloat()
+            settings.value("thresholdValue").toFloat(),
+            settings.value("isColored").toBool()
             }
         );
         if (documentProfiles.back().isActive) {
-            activeDocumentProfile = &documentProfiles.back();
+            activeDocumentProfile.reset(&documentProfiles.back());
         }
         settings.endGroup();
     }
@@ -62,11 +60,11 @@ std::vector<Settings::s_documentProfile> Settings::getDocumentProfiles() {
             false,
             Settings::Language::deu,
             600,
-            Settings::ThresholdMethod::autoThreshold,
-            0.993
+            0.993,
+            false
             }
         );
-        activeDocumentProfile = &documentProfiles.back();
+        activeDocumentProfile.reset(&documentProfiles.back());
     }
     return documentProfiles;
 }
@@ -91,6 +89,10 @@ std::string Settings::getSSHKeyPath() {
         sshKeyPath = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).value(0) + ".ssh/";
     }
     return sshKeyPath.toStdString();
+}
+
+int Settings::resolution() {
+    return activeDocumentProfile->resolution;
 }
 
 /********************************** class SettingsUI **********************************
@@ -151,6 +153,12 @@ void SettingsUI::createNetworkTab() {
     lePassword.setEchoMode(QLineEdit::PasswordEchoOnEdit);
     layoutNetworkForm.addRow(tr("Password: "), &lePassword);
 
+    // Create DocumentProfile entries
+    for (auto &documentProfile : getDocumentProfiles()) {
+        cbDocumentProfileName.addItem(documentProfile.name.c_str());
+    }
+    layoutNetworkForm.addRow(tr("Document profile: "), &cbDocumentProfileName);
+
     layoutNetworkH.addLayout(&layoutNetworkForm);
 
     pbAdd.setText(tr("&Add"));
@@ -174,11 +182,12 @@ void SettingsUI::createNetworkTab() {
     qtwSettings.addTab(&qNetworkWidget, tr("Network profiles"));
 
     // Connect Signals of networkProfile widgets
-        QObject::connect(&leHost, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
+    QObject::connect(&leHost, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
     QObject::connect(&sbPort, &QSpinBox::valueChanged, this, &SettingsUI::updateVector);
     QObject::connect(&leDirectory, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
     QObject::connect(&leUsername, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
     QObject::connect(&lePassword, &QLineEdit::textChanged, this, &SettingsUI::updateVector);    
+    QObject::connect(&cbDocumentProfileName, &QComboBox::currentTextChanged, this, &SettingsUI::updateVector);
 
     // Load network profiles
     setNetworkProfiles();
@@ -190,6 +199,7 @@ void SettingsUI::setNetworkProfiles() {
         networkProfiles.emplace_back(Settings::s_networkProfile{
             profile.name,
             profile.isDefault,
+            profile.documentProfileName,
             profile.url}
         );
 
@@ -201,6 +211,7 @@ void SettingsUI::setNetworkProfiles() {
             leDirectory.setText(QString::fromStdString(profile.url.Directory()));
             leUsername.setText(QString::fromStdString(profile.url.Username()));
             lePassword.setText(QString::fromStdString(profile.url.Password()));
+            cbDocumentProfileName.setCurrentText(QString::fromStdString(profile.documentProfileName));
         }
     }
 }
@@ -243,9 +254,20 @@ void SettingsUI::addNetworkProfile() {
     layoutNetworkButtons.setEnabled(true);
 
     // Add networkProfile vector element with default entries
+
+    // Get default Document Profile
+    std::string defaultDocumentProfileName;
+    for (auto &profile : getDocumentProfiles()) {
+        if (profile.isActive) {
+            defaultDocumentProfileName = profile.name;
+            break;
+        }
+    }
+    
     networkProfiles.emplace_back(Settings::s_networkProfile{
         "defaultname",
         false,
+        defaultDocumentProfileName,
         ParseUrl{"sftp://Hostname:22/Directory/"}}
     );
 
@@ -336,15 +358,15 @@ void SettingsUI::createDocumentTab() {
     QObject::connect(&sbResolution, &QSpinBox::valueChanged, this, &SettingsUI::setStepValue);
     layoutDocumentForm.addRow(tr("Resolution: "), &sbResolution);
 
-    cbThresholdMethod.addItem("autoThreshold");
-    cbThresholdMethod.addItem("adaptiveThreshold");
-    cbThresholdMethod.addItem("Threshold");
-    layoutDocumentForm.addRow(tr("Threshold method: "), &cbThresholdMethod);
     sbThresholdValue.setDecimals(3);
     sbThresholdValue.setRange(0.001, 0.999);
     sbThresholdValue.setSingleStep(0.001);
     sbThresholdValue.setValue(0.993);
     layoutDocumentForm.addRow(tr("Threshold value: "), &sbThresholdValue);
+    
+    cbIsColored.setCheckState(Qt::Unchecked);
+    layoutDocumentForm.addRow(tr("Preserve colors"), &cbIsColored);
+
     layoutDocumentH.addLayout(&layoutDocumentForm);
 
     pbAddDocumentProfile.setText(tr("&Add"));
@@ -367,8 +389,8 @@ void SettingsUI::createDocumentTab() {
     QObject::connect(&lwDocumentProfiles, &QListWidget::currentRowChanged, this, &SettingsUI::updateVector);
     QObject::connect(&cbLanguage, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsUI::updateVector);
     QObject::connect(&sbResolution, QOverload<int>::of(&QSpinBox::valueChanged), this, &SettingsUI::updateVector);
-    QObject::connect(&cbThresholdMethod, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsUI::updateVector);
     QObject::connect(&sbThresholdValue, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &SettingsUI::updateVector);
+    QObject::connect(&cbIsColored, QOverload<int>::of(&QCheckBox::stateChanged), this, &SettingsUI::updateVector);
 
     // Load document profiles
     setDocumentProfiles();
@@ -393,13 +415,22 @@ void SettingsUI::setStepValue(int newValue) {
 void SettingsUI::setDocumentProfiles() {
     for (auto& profile : getDocumentProfiles()) {
         lwDocumentProfiles.addItem(QString::fromStdString(profile.name));
+        documentProfiles.emplace_back(Settings::s_documentProfile{
+            profile.name,
+            profile.isActive,
+            profile.language,
+            profile.resolution,
+            profile.thresholdValue,
+            profile.isColored}
+        );
+
         if (profile.isActive) {    
             // Set the font to bold of the last added item
             lwDocumentProfiles.item(lwDocumentProfiles.count() - 1)->setFont(QFont("", -1, QFont::Bold));
             cbLanguage.setCurrentIndex(static_cast<int>(profile.language));
             sbResolution.setValue(profile.resolution);
-            cbThresholdMethod.setCurrentIndex(static_cast<int>(profile.thresholdMethod));
             sbThresholdValue.setValue(profile.thresholdValue);
+            cbIsColored.setChecked(profile.isColored);
         }
     }
 }
@@ -418,8 +449,8 @@ void SettingsUI::addDocumentProfile() {
         false,
         Settings::Language::deu,
         600,
-        Settings::ThresholdMethod::autoThreshold,
-        0.993}
+        0.993,
+        false}
     );
 
     // If it is the first profile, make it the active one
@@ -441,31 +472,12 @@ void SettingsUI::removeDocumentProfile() {
     }
 }
 
-void SettingsUI::setDefaultDocumentProfile() {
-    if (lwDocumentProfiles.currentItem() != nullptr) {
-        // New default element
-        int defaultNr {lwDocumentProfiles.currentRow()};
-
-        // Remove the old default
-        for (int i=0; i< lwDocumentProfiles.count(); i++) {
-            if (lwDocumentProfiles.item(i) ->font().bold()) {
-                lwDocumentProfiles.item(i)->setFont(QFont("", -1));
-                documentProfiles.at(i).isActive = false;
-            }
-        }
-
-        // Set new default
-        documentProfiles.at(defaultNr).isActive = true;
-        lwDocumentProfiles.item(defaultNr)->setFont(QFont("", -1, QFont::Bold));
-    }
-}
-
 void SettingsUI::changedDocumentProfile(int index) {
     documentProfiles.at(index).name = lwDocumentProfiles.currentItem()->text().toStdString();
     cbLanguage.setCurrentIndex(index);
     sbResolution.setValue(documentProfiles.at(index).resolution);
-    cbThresholdMethod.setCurrentIndex(static_cast<int>(documentProfiles.at(index).thresholdMethod));
     sbThresholdValue.setValue(documentProfiles.at(index).thresholdValue);
+    cbIsColored.setChecked(documentProfiles.at(index).isColored);
 }
 
 bool SettingsUI::validateDocumentProfile() {
@@ -559,6 +571,9 @@ void SettingsUI::updateVector() {
         else if (senderObject == &lePassword) {
             networkProfiles[profileIndexNetwork].url.Password(lePassword.text().toStdString());
         }
+        else if (senderObject == &cbDocumentProfileName) {
+            networkProfiles[profileIndexNetwork].documentProfileName = cbDocumentProfileName.currentText().toStdString();
+        }
     }
     if (profileIndexDocument>=0) {
         if (senderObject == &cbLanguage) {
@@ -567,11 +582,11 @@ void SettingsUI::updateVector() {
         else if (senderObject == &sbResolution) {
             documentProfiles[profileIndexDocument].resolution = sbResolution.value();
         }
-        else if (senderObject == &cbThresholdMethod) {
-            documentProfiles[profileIndexDocument].thresholdMethod = static_cast<Settings::ThresholdMethod>(cbThresholdMethod.currentIndex());
-        }
         else if (senderObject == &sbThresholdValue) {
             documentProfiles[profileIndexDocument].thresholdValue = sbThresholdValue.value();
+        }
+        else if (senderObject == &cbIsColored) {
+            documentProfiles[profileIndexDocument].isColored = cbIsColored.isChecked();
         }
     }
 }
@@ -603,6 +618,7 @@ void SettingsUI::accepted() {
         settings.beginGroup(profile.name);
         settings.setValue("isDefault", profile.isDefault);
         settings.setValue("url", QString::fromStdString(profile.url.Url()));
+        settings.setValue("documentProfileName", QString::fromStdString(profile.documentProfileName));
         settings.endGroup();
     }
     settings.endGroup();
@@ -614,8 +630,8 @@ void SettingsUI::accepted() {
         settings.setValue("isActive", profile.isActive);
         settings.setValue("language", static_cast<int>(profile.language));
         settings.setValue("resolution", profile.resolution);
-        settings.setValue("thresholdMethod", static_cast<int>(profile.thresholdMethod));
         settings.setValue("thresholdValue", profile.thresholdValue);
+        settings.setValue("isColored", profile.isColored);
         settings.endGroup();
     }
     settings.endGroup();

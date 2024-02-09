@@ -16,6 +16,7 @@
 #include <QListWidget>
 #include <QSpinBox>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QSettings>
 #include <QDir>
@@ -24,11 +25,6 @@
 class Settings {
 
 public:
-    enum class ThresholdMethod {
-        autoThreshold,
-        adaptiveThreshold,
-        threshold
-    };
 
     enum class Language {
         deu,
@@ -38,6 +34,7 @@ public:
     struct s_networkProfile {
         std::string name;
         bool isDefault;
+        std::string documentProfileName;
         ParseUrl url;
     };
 
@@ -46,10 +43,21 @@ public:
         bool isActive;
         Language language {Language::deu};
         int resolution {600};
-        ThresholdMethod thresholdMethod {ThresholdMethod::autoThreshold};
         float thresholdValue {0.993};
+        bool isColored {false};
     };
-    Settings::s_documentProfile* activeDocumentProfile;
+
+    std::vector<Settings::s_networkProfile> networkProfiles;
+    std::vector<s_documentProfile> documentProfiles;
+
+    std::unique_ptr<Settings::s_documentProfile> activeDocumentProfile = std::make_unique<Settings::s_documentProfile>(Settings::s_documentProfile{
+        "default",
+        false,
+        Settings::Language::deu,
+        600,
+        0.993,
+        false
+    });
 
     struct s_ProfileElement {
         std::string Element;
@@ -70,7 +78,7 @@ public:
         return std::filesystem::temp_directory_path().string() + "/";
     };
 
-    int resolution() { return activeDocumentProfile->resolution;}
+    int resolution();
 
     std::string language() {
         switch (activeDocumentProfile->language) {
@@ -82,10 +90,10 @@ public:
                 return "deu";
         };
     }
-
-    ThresholdMethod thresholdMethod() { return activeDocumentProfile->thresholdMethod; }
     
     float thresholdValue() { return activeDocumentProfile->thresholdValue; }
+
+    bool isColored() { return activeDocumentProfile->isColored; }
 };
 
 class SettingsUI : public QWidget, public Settings
@@ -168,6 +176,7 @@ private:
     QLineEdit leDirectory;
     QLineEdit leUsername;
     QLineEdit lePassword;
+    QComboBox cbDocumentProfileName;
     
     QListWidget lwNetworkProfiles;
 
@@ -187,8 +196,8 @@ private:
 
     QComboBox cbLanguage;
     QSpinBox sbResolution;
-    QComboBox cbThresholdMethod;
     QDoubleSpinBox sbThresholdValue;
+    QCheckBox cbIsColored;
 
     QListWidget lwDocumentProfiles;
 

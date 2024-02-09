@@ -82,11 +82,15 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
 
                     ParseUrl newUrl ("file://" + entry.path().string());
 
+#ifndef DEBUG
                     auto lambdaThread = [=]()-> void{
+#endif
                         pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, newUrl.FileDir(), m_Status));
                         emit newFileComplete(entry.path().filename().string());
+#ifndef DEBUG
                     };
                     threads.push_back(std::thread(lambdaThread));
+#endif
                 }
             }
         }
@@ -137,7 +141,9 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                     
                     // get file from sftp server if pdf
                     if (filename.size() > 3 && filename.substr(filename.length() - 3) == "pdf"){
+#ifndef DEBUG
                         auto lambdaThread = [=]()-> void{
+#endif
                             maxStatus += c_statusIncrement;
                             emit newFileAdded();
 
@@ -151,17 +157,21 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                             pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, tmpFileName, m_Status));
 
                             emit newFileComplete(filename);
+#ifndef DEBUG
                         };
 
                         threads.push_back(std::thread(lambdaThread));
+#endif
                     }
                 }
             } 
         }
     }
+#ifndef DEBUG
     for (auto& thread : threads) {
         thread.join();
     }
+#endif
     emit finishedProcessing();
     return true;
 }
@@ -252,24 +262,17 @@ bool PdfFile::transcodeToTiff() {
 
     for (auto &image : pdfImgList)
     {
-        // Turn into black and white image
-        switch (settings.thresholdMethod()) {
-        case Settings::ThresholdMethod::autoThreshold:
+        // Turn into black and white image if isColored == false
+        if (settings.isColored() == false) {
             image.autoThreshold(MagickCore::AutoThresholdMethod::OTSUThresholdMethod);
-            break;
-        case Settings::ThresholdMethod::adaptiveThreshold:
-            image.adaptiveThreshold(10,10, 2);
-            break;
-        case Settings::ThresholdMethod::threshold:
             image.threshold(settings.thresholdValue());
-            break;
-        default:
-            break;
-        }
 
-        // Change encoding to Tiff G4
-        image.magick("TIFF");
-        image.compressType(Magick::CompressionType::Group4Compression);
+            // Change encoding to Tiff G4
+            image.magick("TIFF");
+            image.compressType(Magick::CompressionType::Group4Compression);
+        }
+        // If isColored == true, don't touch encoding
+        // TODO: Test if tesseract && poppler can handle jpeg encoded images
     }
     return true;
 }
