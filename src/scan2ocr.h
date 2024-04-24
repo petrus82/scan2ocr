@@ -22,16 +22,8 @@ global::getUniqueFileName for temp file name
 
 #include <filesystem>
 #include <string>
-
-inline namespace constants{
-    constexpr const char* inputDir="/home/simon/";
-    constexpr const char* sshPrivateKeyPath = "/home/simon/.ssh/";
-    constexpr const char* iLanguage = "deu";
-    const std::string iPathDestination = "/home/simon/Desktop/Scans";
-    constexpr const float Threshold = 0.993; 
-    // Get temp dir
-    const std::string tmpDir = std::filesystem::temp_directory_path().string() + "/";
-}
+#include <QStandardPaths>
+#include "parseurl.h"
 
 std::string getUniqueFileName();
 

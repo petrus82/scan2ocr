@@ -47,11 +47,6 @@ Its format is in the form /directory/filename
 */
 
 PdfFileList::~PdfFileList() {
-    for (auto pdfFile : pdfFiles) {
-        if (pdfFile != nullptr) {
-            delete pdfFile;
-        }
-    }
     pdfFiles.clear();
 }
 
@@ -70,8 +65,7 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
             maxStatus += c_statusIncrement;
             emit newFileAdded();
 
-            PdfFile* pdfFile = new PdfFile(Url, Url.FileDir(), m_Status);
-            pdfFiles.push_back(pdfFile);
+            pdfFiles.emplace_back(std::make_unique<PdfFile>(Url, Url.FileDir(), m_Status));
             emit newFileComplete(Url.Filename());
             
             emit finishedProcessing();
@@ -88,13 +82,15 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
 
                     ParseUrl newUrl ("file://" + entry.path().string());
 
+#ifndef DEBUG
                     auto lambdaThread = [=]()-> void{
-                        PdfFile* pdfFile = new PdfFile (newUrl, newUrl.FileDir(), m_Status);
-                        pdfFiles.push_back(pdfFile);
-
+#endif
+                        pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, newUrl.FileDir(), m_Status));
                         emit newFileComplete(entry.path().filename().string());
+#ifndef DEBUG
                     };
                     threads.push_back(std::thread(lambdaThread));
+#endif
                 }
             }
         }
@@ -109,8 +105,7 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
             FtpConnection ftpConnection (Url);
 
             std::string filename = ftpConnection.getFile(Url.Filename(), Url.Directory());
-            PdfFile* pdfFile = new PdfFile(Url, filename, m_Status);
-            pdfFiles.push_back(pdfFile);
+            pdfFiles.emplace_back(std::make_unique<PdfFile>(Url, filename, m_Status));
             emit newFileComplete(Url.Filename());
 
             emit finishedProcessing();
@@ -146,9 +141,10 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                     
                     // get file from sftp server if pdf
                     if (filename.size() > 3 && filename.substr(filename.length() - 3) == "pdf"){
+#ifndef DEBUG
                         auto lambdaThread = [=]()-> void{
+#endif
                             maxStatus += c_statusIncrement;
-                            std::cout << "newFileAdded" << std::endl;
                             emit newFileAdded();
 
                             // We are in a new thread, get a new ftpConnection                            
@@ -158,22 +154,24 @@ bool PdfFileList::addFiles(ParseUrl &Url) {
                             ParseUrl newUrl(Url);
                             newUrl.Filename(filename);
                             newUrl.Directory(fileDirectory);
-                            PdfFile* pdfFile = new PdfFile(newUrl, tmpFileName, m_Status);
-                            pdfFiles.push_back(pdfFile);
+                            pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, tmpFileName, m_Status));
 
-                            std::cout << "newFileComplete" << std::endl;
                             emit newFileComplete(filename);
+#ifndef DEBUG
                         };
 
                         threads.push_back(std::thread(lambdaThread));
+#endif
                     }
                 }
             } 
         }
     }
+#ifndef DEBUG
     for (auto& thread : threads) {
         thread.join();
     }
+#endif
     emit finishedProcessing();
     return true;
 }
@@ -191,7 +189,7 @@ bool PdfFileList::removeFile(int Element) {
         try {
             std::filesystem::remove(localFile);
         } catch (std::filesystem::filesystem_error& e) {
-            QMessageBox::critical(nullptr, "Error Deleting file", QString::fromStdString(e.what()));
+            QMessageBox::critical(nullptr, tr("Error Deleting file"), QString::fromStdString(e.what()));
             return false;
         }
     }
@@ -201,8 +199,7 @@ bool PdfFileList::removeFile(int Element) {
         ftpConnection.deleteFile(Url.FileDir());
     }
 
-    // Delete instance of _pdfFile, remove from pdfFileList
-    delete pdfFiles[Element];
+    // remove from pdfFileList
     pdfFiles.erase(pdfFiles.begin() + Element);
     return true;
 }
@@ -220,32 +217,28 @@ bool PdfFileList::removeFile(int Element) {
 PdfFile::PdfFile(ParseUrl Url, const std::string &localCopy, int &status, QObject *parent) : QObject(parent), m_Url(Url), m_LocalCopy(localCopy) {
     if (ptr_cfMain != nullptr) {
         QObject::connect(this, SIGNAL(statusChange()), ptr_cfMain, SLOT(statusUpdate()), Qt::DirectConnection);
-        std::cout << "connected pdfFile::statusChange to statusUpdate" <<  Url.Filename() << std::endl;
     }
     
     // Read PdfFile into Memory
     Magick::ReadOptions options;
-    options.density(Magick::Geometry(600, 600));        // Set Resolution of input image to 600 dpi
+    int resolution {settings.resolution()};
+    options.density(Magick::Geometry(resolution, resolution));        // Set Resolution of input image to 600 dpi
     Magick::readImages(&pdfImgList, m_LocalCopy, options);
     
     status++;
     emit statusChange();
-    std::cout << "Status change " << Url.Filename() <<  std::endl;
     removeEmptyPage();
 
     status++;
     emit statusChange();
-    std::cout << "Status change " <<  Url.Filename() << std::endl;
     transcodeToTiff();
 
     status++;
     emit statusChange();
-    std::cout << "Status change " <<  Url.Filename() << std::endl;
     ocrPdf();
 
     status++;
     emit statusChange();
-    std::cout << "Status change " <<  Url.Filename() << std::endl;
     m_possibleFileName = getPossibleFileName();
 }
 
@@ -256,7 +249,7 @@ bool PdfFile::removeEmptyPage() {
         Magick::ImageStatistics Statistics = image.statistics();
         double mean_val = Statistics.channel(MagickCore::PixelChannel()).mean();
         mean_val /= 1 << 16;
-        if (mean_val > Threshold)
+        if (mean_val > settings.thresholdValue())
         {
             it = pdfImgList.erase(it);
         }
@@ -269,19 +262,24 @@ bool PdfFile::transcodeToTiff() {
 
     for (auto &image : pdfImgList)
     {
-        // Turn into black and white image
-        image.autoThreshold(MagickCore::AutoThresholdMethod::OTSUThresholdMethod);
+        // Turn into black and white image if isColored == false
+        if (settings.isColored() == false) {
+            image.autoThreshold(MagickCore::AutoThresholdMethod::OTSUThresholdMethod);
+            image.threshold(settings.thresholdValue());
 
-        // Change encoding to Tiff G4
-        image.magick("TIFF");
-        image.compressType(Magick::CompressionType::Group4Compression);
+            // Change encoding to Tiff G4
+            image.magick("TIFF");
+            image.compressType(Magick::CompressionType::Group4Compression);
+        }
+        // If isColored == true, don't touch encoding
+        // TODO: Test if tesseract && poppler can handle jpeg encoded images
     }
     return true;
 }
 
 bool PdfFile::ocrPdf() {
     tesseract::TessBaseAPI ocr;
-    ocr.Init(NULL, iLanguage, tesseract::OEM_LSTM_ONLY);
+    ocr.Init(NULL, settings.language().c_str(), tesseract::OEM_LSTM_ONLY);
 
     // Tesseract always adds .pdf to the file name
     // To have the output of tesseract into m_tempFileName remove the .pdf from m_tempFileName
@@ -294,7 +292,7 @@ bool PdfFile::ocrPdf() {
     // Write OCRPDF to OutputFile
     bool retVal = ocr.ProcessPages(InputOCR.c_str(), NULL, 0,  renderer);
     if (!retVal) {
-        QMessageBox::critical(nullptr, "Error", QString("Error writing output pdf ") + QString::fromStdString(m_tempFileName));
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error writing output pdf ")) + QString::fromStdString(m_tempFileName));
         return false;
     }
 
@@ -327,7 +325,7 @@ std::string PdfFile::getPossibleFileName() {
     std::unique_ptr<poppler::document> pdfDoc(poppler::document::load_from_file (m_tempFileName.c_str()));
     
     if (!pdfDoc) {
-        QMessageBox::critical(nullptr, "Error", QString("Error opening ") + QString::fromStdString(m_tempFileName));
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error opening ")) + QString::fromStdString(m_tempFileName));
         return "";
     }
 
@@ -335,7 +333,7 @@ std::string PdfFile::getPossibleFileName() {
     std::unique_ptr<poppler::page> firstPage(pdfDoc->create_page(0));
 
     if (!firstPage) {
-        QMessageBox::critical(nullptr, "Error", QString("Error getting first page"));
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error getting first page")));
         return "";
     }
 
@@ -381,9 +379,12 @@ std::string PdfFile::getPossibleFileName() {
         possibleFileName = ss.str() + possibleFileName;
     }
 
-    // Check if the file is an invoice, if so add the word "Rechnung" to the filename   
-    if (text.find("Rechnung") != std::string::npos) {
-        possibleFileName += " - Rechnung";
+    // Check if the file is an invoice
+    // first we have to get the current application language
+    const std::string invoiceString {QString(tr("Invoice")).toStdString()};
+
+    if (text.find(invoiceString) != std::string::npos) {
+        possibleFileName += " - " + invoiceString;
     }
 
     possibleFileName += ".pdf";

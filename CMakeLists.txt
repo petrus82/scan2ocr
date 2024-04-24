@@ -7,7 +7,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG  "-g")
 
-find_package(Qt6 COMPONENTS Core Gui Widgets PdfWidgets REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets PdfWidgets LinguistTools)
 find_package(ImageMagick COMPONENTS Magick++)
 find_package(libssh)
 
@@ -25,40 +25,43 @@ endif()
 # Set the debug flags
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
-qt_add_executable(scan2ocr  
-    scan2ocr.qrc
-    src/cfopen.cpp
-    src/cfmain.cpp
-    src/pdffile.cpp
-    src/scan2ocr.cpp
-    src/ftpconnection.cpp
-    src/parseurl.cpp
-    src/cfopen.h
-    src/cfmain.h
-    src/pdffile.h
-    src/ftpconnection.h
-    src/parseurl.h
-    src/scan2ocr.h
-)
+# Add CodeQL options
+# option(ENABLE_CODEQL "Enable CodeQL analysis" OFF)
+# if(ENABLE_CODEQL)
+#  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# endif()
 
 set(SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(SOURCE_FILES
   CMakeLists.txt
   scan2ocr.qrc
-  src/cfopen.cpp
-  src/cfmain.cpp
+  src/mainwindow.cpp
   src/pdffile.cpp
   src/scan2ocr.cpp
   src/ftpconnection.cpp
   src/parseurl.cpp
-  src/cfopen.h
-  src/cfmain.h
+  src/settings.cpp
+  src/mainwindow.h
   src/pdffile.h
   src/ftpconnection.h
   src/parseurl.h
   src/scan2ocr.h
+  src/settings.h
 )
 
+qt_add_executable(scan2ocr  
+    ${SOURCE_FILES}
+)
+
+# Add translation
+qt6_add_translations(scan2ocr TS_FILES german.ts LUPDATE_OPTIONS -no-obsolete)
+
+add_dependencies(scan2ocr scan2ocr_lupdate)
+add_dependencies(scan2ocr update_translations)
+
+  #QM_FILES_OUTPUT_VARIABLE qm_files)
+
+ # install(FILES ${qm_files} DESTINATION "translations")
 
 target_include_directories(scan2ocr PRIVATE
     ${CMAKE_PROJECT_INCLUDE_DIR}
@@ -82,6 +85,7 @@ target_compile_options(scan2ocr PRIVATE
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Add debug flags
   target_compile_options(scan2ocr PRIVATE -ggdb3)
+  add_compile_definitions(DEBUG)
 else()
   # Add flags for clean and stripped executable
   target_compile_options(scan2ocr PRIVATE -s -O3 -DNDEBUG)
@@ -121,8 +125,29 @@ set(CMAKE_INSTALL_PREFIX /usr)
 set(CPACK_SOURCE_GENERATOR_DISABLED)
 set(CPACK_SOURCE_GENERATOR_TGZ ON)
 
+#install(FILES ${qm_files} DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME})
+
 include(CPack)
 
+# Add CodeQL analysis step
+#if(ENABLE_CODEQL)
+#  find_program(CODEQL_CLI_EXECUTABLE "codeql")
+#  if(CODEQL_CLI_EXECUTABLE)
+#    add_custom_target(codeql
+#      COMMAND ${CODEQL_CLI_EXECUTABLE} database analyze --format=sarif-latest
+#        --output=scan2ocr.sarif -- code-analysis .
+#      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+#      COMMENT "Running CodeQL analysis"
+#    )
+#  else()
+#    message(WARNING "CodeQL CLI not found. Skipping CodeQL analysis.")
+#  endif()
+#endif()
 
 # Debug: cmake -DCMAKE_BUILD_TYPE=Debug .
 # Release: cmake -DCMAKE_BUILD_TYPE=Release .
+# With CodeQL:
+# cmake -DENABLE_CODEQL=ON .
+# cmake --build .
+# cmake --build . --target codeql
+# codeql database create code-analysis --language=cpp --command='cmake --build . --target all --config Release -- -j4'

@@ -35,21 +35,21 @@ public:
     std::string RawFilename() const;
     void RawFilename(const std::string RawFilename);
     
-    std::string getUrl();
-    std::string Url() const;
+    std::string Url();
+    void Url(const std::string Url);
     
-    QUrl qUrl() const;
+    QUrl qUrl();
 
 private:
-    std::string url;
-    std::string scheme;
-    std::string host;
-    int port;
-    std::string username;
-    std::string password;
-    std::string directory;
-    std::string filename;
-    std::string rawFilename;
+    std::string m_url {""};
+    std::string scheme {""};
+    std::string host {""};
+    int port {0};
+    std::string username {""};
+    std::string password {""};
+    std::string directory {""};
+    std::string filename {""};
+    std::string rawFilename {""};
 };
 
 #endif

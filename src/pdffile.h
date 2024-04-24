@@ -22,6 +22,7 @@
 
 #include "parseurl.h"
 #include "ftpconnection.h"
+#include "settings.h"
 #include "scan2ocr.h"
 
 class PdfFile;
@@ -35,7 +36,9 @@ public:
         return instance;    
     }
 
-    PdfFile *pdfFile (int Element) {return pdfFiles[Element];};
+    std::unique_ptr<PdfFile>&pdfFile (int Element) {
+        return pdfFiles[Element];
+    };
     
     int maxFiles() const { return pdfFiles.size(); };
     
@@ -71,7 +74,7 @@ private:
     PdfFileList& operator=(const PdfFileList&) = delete;
 
     int m_Status {0};
-    std::vector<PdfFile*>pdfFiles;
+    std::vector<std::unique_ptr<PdfFile>> pdfFiles;
     static constexpr const int c_statusIncrement = 4;
     QMainWindow *p_cfMain {nullptr};                // Ptr to instance of cfMain to connect statusUpdate SLOT
     
@@ -104,11 +107,13 @@ private:
     std::string getPossibleFileName ();
 
     ParseUrl m_Url;
+    Settings settings;
     QMainWindow *ptr_cfMain = dynamic_cast<QMainWindow*>(PdfFileList::get_instance().instance_cfMain());
     
     std::string m_possibleFileName;
-    std::string m_tempFileName {constants::tmpDir + getUniqueFileName()};
+    std::string m_tempFileName {settings.TmpDir() + getUniqueFileName()};
     std::string m_LocalCopy {""};
+  
 };
 
 #endif
