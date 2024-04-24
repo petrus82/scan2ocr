@@ -146,7 +146,6 @@ private slots:
 
     void addDocumentProfile();
     void removeDocumentProfile();
-    void setDefaultDocumentProfile();
 
     void changedDocumentProfile(int currentRow);
 

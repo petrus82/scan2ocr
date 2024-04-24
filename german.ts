@@ -332,34 +332,34 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="511"/>
+        <location filename="src/settings.cpp" line="492"/>
         <source>Default document profile name for profile nr° </source>
         <oldsource>Empty document profile name for profile nr° </oldsource>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="513"/>
+        <location filename="src/settings.cpp" line="494"/>
         <source>. Do you want to delete it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="535"/>
-        <location filename="src/settings.cpp" line="539"/>
+        <location filename="src/settings.cpp" line="516"/>
+        <location filename="src/settings.cpp" line="520"/>
         <source>The </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="535"/>
+        <location filename="src/settings.cpp" line="516"/>
         <source> directory does not exist. Do you want to create it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="539"/>
+        <location filename="src/settings.cpp" line="520"/>
         <source> directory could not be created</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.cpp" line="564"/>
+        <location filename="src/settings.cpp" line="545"/>
         <source>Path settings</source>
         <translation type="unfinished"></translation>
     </message>
@@ -367,19 +367,19 @@
         <location filename="src/settings.cpp" line="316"/>
         <location filename="src/settings.cpp" line="328"/>
         <location filename="src/settings.cpp" line="332"/>
-        <location filename="src/settings.cpp" line="510"/>
-        <location filename="src/settings.cpp" line="535"/>
-        <location filename="src/settings.cpp" line="539"/>
+        <location filename="src/settings.cpp" line="491"/>
+        <location filename="src/settings.cpp" line="516"/>
+        <location filename="src/settings.cpp" line="520"/>
         <source>Error</source>
         <translation type="unfinished">Fehler</translation>
     </message>
     <message>
-        <location filename="src/settings.h" line="215"/>
+        <location filename="src/settings.h" line="214"/>
         <source>Destination directory:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/settings.h" line="217"/>
+        <location filename="src/settings.h" line="216"/>
         <source>SSH key path:</source>
         <translation type="unfinished"></translation>
     </message>
