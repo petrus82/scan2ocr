@@ -37,8 +37,10 @@ jobs:
       -   name: Install ImageMagick 7
           run:  |
             wget https://imagemagick.org/archive/ImageMagick.tar.gz
-            tar xvzf ImageMagick.tar.gz -C image-magick
+            mkdir image-magick
+            tar -xzvf ImageMagick.tar.gz -C image-magick/
             cd image-magick
+            cd `ls`
             ./configure
             make
             sudo make install
