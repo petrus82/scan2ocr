@@ -28,6 +28,23 @@
 
 QT_BEGIN_NAMESPACE
 
+class PathDialog : public QFileDialog {
+    Q_OBJECT
+
+public:
+    void addWidget();
+    PathDialog(QWidget *parent) : QFileDialog(parent) {
+        addWidget();
+    }; 
+    bool isRecursive() const;
+
+private:
+    
+    QHBoxLayout hbl;
+    QCheckBox cbRecursive;
+
+};
+
 class MainWindow : public QMainWindow {
 
 Q_OBJECT
@@ -36,12 +53,12 @@ public:
     ~MainWindow();
 
 public slots:
-    void loadPdf(const QString &fileName);
-    void newFile(const std::string Filename);
+    //void loadPdf(const QString &fileName);
+    void newFileFound(std::shared_ptr<ParseUrl>ptr_Url);
     void statusUpdate();
-    void processFinished();
+    void filesProcessed();
     void setMaxProgress();
-    void rename();
+    void save();
     void getDestinationDir();
     void deleteFileSlot();
 
@@ -59,11 +76,12 @@ private slots:
 private:
 
     void createMenu();
-    void createNetworkMenuEntry (Settings::s_networkProfile &netProfile);
+    void createNetworkMenuEntry (Settings::networkProfile *netProfile);
     void createOtherWidgets();
     void setTabOrder();
     void setText();
     void connectSignals();
+    void processFiles();
     void deleteFile (const int element);
     
     QWidget centralWidget {this};
@@ -90,10 +108,14 @@ private:
     QAction settingsAction {tr("Se&ttings..."), this};
     QAction cancelAction {tr("&Quit"), this};
     QAction aboutAction {tr("Abou&t"), this};
-    std::unique_ptr<QComboBox> cbNetworkProfiles {nullptr};
-    std::unique_ptr<QAction> networkProfileAction {nullptr};
+    QToolButton tbDefaultNetworkEntry {&toolBar};
+    QToolButton tbNetworkProfiles {&toolBar};
 
-    QString destinationDir {""};
+    std::unique_ptr<QAction> networkProfileAction;
+
+    std::vector <std::shared_ptr<PdfFile>> vec_pdfFiles;    
+    std::shared_ptr<Directory> p_Directory;                 
+
     QPdfDocument pdfDocument;
     QCompleter completer;
 
@@ -101,14 +123,13 @@ private:
     const std::string defaultTextHost {""};
     const std::string defaultTextDirectory {""};
     
-    PdfFileList &pdfFileList = PdfFileList::get_instance();
     Settings settings;
 };
 
 QT_END_NAMESPACE
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email ( at ) simonboettger. de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

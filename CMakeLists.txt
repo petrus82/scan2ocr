@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
-project(scan2ocr VERSION 0.0.1 LANGUAGES CXX)
+project(scan2ocr VERSION "0.0.3" LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
+set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG  "-g")
 
@@ -79,6 +80,7 @@ target_compile_options(scan2ocr PRIVATE
     -DMAGICKCORE_HDRI_ENABLE=1
     -DMAGICKCORE_CHANNEL_MASK_DEPTH=32
     -DMAGICKCORE_QUANTUM_DEPTH=16
+    -DPROGRAM_VERSION="${PROJECT_VERSION}"
 )
 
 # Conditionally add flags based on build type
@@ -114,7 +116,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Gui Qt6::Widg
 install(TARGETS scan2ocr DESTINATION bin)
 
 set(CPACK_PACKAGE_NAME "scan2ocr")
-set(CPACK_PACKAGE_VERSION "0.0.1")
+set(CPACK_PACKAGE_VERSION "0.0.3")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Convert scanned files to black/white PDFs with text using OCR.")
 set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}")
 set(CPACK_GENERATOR "TGZ")

@@ -5,11 +5,18 @@ FtpConnection::~FtpConnection() {
     disconnect();
 }
 
-FtpConnection::FtpConnection(const ParseUrl &Url) : RemoteHost(Url.Host()), Port(Url.Port()), username(Url.Username()), ftpPassword(Url.Password()) {
-    
+FtpConnection::FtpConnection(const ParseUrl &Url) : RemoteHost(Url.Host()), 
+    Port(Url.Port()), Filename(Url.Filename()), 
+    Directory(Url.Directory()), 
+    Username(Url.Username()), 
+    FtpPassword(Url.Password()) {
+        #ifdef DEBUG
+            std::cout << "FtpConnection(): Connecting to " << RemoteHost << ":" << Port << Directory << Filename << std::endl;
+        #endif
 }
 
 void FtpConnection::getConnection() {
+
     if (session == NULL) {
         session = ssh_new();
     }
@@ -30,7 +37,7 @@ void FtpConnection::getConnection() {
     }
 
     Settings settings;
-    ssh_options_set(session, SSH_OPTIONS_IDENTITY, settings.getSSHKeyPath().c_str());
+    ssh_options_set(session, SSH_OPTIONS_IDENTITY, settings.SSHKeyPath().toStdString().c_str());
 
     int rc = ssh_connect(session);
 
@@ -50,10 +57,10 @@ void FtpConnection::getConnection() {
     }
 
     // First try to authenticate with the server using ssh-keys
-    rc = ssh_userauth_publickey_auto(session, NULL, settings.getSSHKeyPath().c_str());
+    rc = ssh_userauth_publickey_auto(session, NULL, settings.SSHKeyPath().toStdString().c_str());
     if (rc != SSH_AUTH_SUCCESS) {
         // Authentication using keys failed, try user/password
-        rc = ssh_userauth_password(session, NULL, ftpPassword.c_str());
+        rc = ssh_userauth_password(session, NULL, FtpPassword.c_str());
         if (rc != SSH_AUTH_SUCCESS) {
             // Also user/password authentication failed, give up
             std::cerr << "Error connecting to FTP server: " << ssh_get_error(session) << std::endl;
@@ -80,10 +87,10 @@ void FtpConnection::disconnect() {
     session = nullptr;
 }
 
-bool FtpConnection::deleteFile(const std::string &url) {
+bool FtpConnection::deleteFile() {
     getConnection();
 
-    const char *cUrl = url.c_str();
+    const char *cUrl = (Directory + "/" + Filename).c_str();
 
     sftp_file file = sftp_open(sftp, cUrl, O_WRONLY, 0);
     if (file == NULL) {
@@ -103,31 +110,24 @@ bool FtpConnection::deleteFile(const std::string &url) {
     return true;
 }
 
-const std::string FtpConnection::getFile(const std::string remoteFilename, const std::string remoteDirectory) {
+std::unique_ptr<Magick::Blob> FtpConnection::getFile() {
     getConnection();
 
-    sftp_file remoteFile = sftp_open(sftp, (remoteDirectory + "/" + remoteFilename).c_str(), O_RDONLY, 0);
+    sftp_file remoteFile = sftp_open(sftp, (Directory + "/" + Filename).c_str(), O_RDONLY, 0);
     if (remoteFile == NULL) {
         std::cerr << "Error opening file: " << ssh_get_error(session) << std::endl;
         return nullptr;
     }
 
-    std::string localFilename = getUniqueFileName();
-
-    FILE* localFile = fopen((localFilename).c_str(), "wb");
-    if (localFile == NULL) {
-        std::cerr << "Error opening local file for writing" << std::endl;
-        sftp_close(remoteFile);
-        disconnect();
-        return nullptr;
-    }
-
-    // Read the remote file and write to the local file
+    // Read the remote file and write to memory object
     char buffer[1024];
     ssize_t nbytes;
+
+    std::string ss;
     while ((nbytes = sftp_read(remoteFile, buffer, sizeof(buffer))) > 0) {
-        fwrite(buffer, 1, nbytes, localFile);
+        ss.append(buffer, nbytes);
     }
+    Magick::Blob blob (ss.data(), ss.length());
 
     // Check for errors
     if (nbytes < 0) {
@@ -138,52 +138,64 @@ const std::string FtpConnection::getFile(const std::string remoteFilename, const
 
     // Close the file
     int rc = sftp_close(remoteFile);
-    fclose(localFile);
     if (rc != SSH_OK) {
         std::cerr << "Error closing file: " << ssh_get_error(session) << std::endl;
         disconnect();
         return nullptr;
     }
     disconnect();
-    return localFilename;
+    return std::make_unique<Magick::Blob>(std::move(blob));
 }
 
-std::vector<sftp_attributes> FtpConnection::getRemoteDir(std::string directory) {
+std::unique_ptr<std::vector<std::string>> FtpConnection::getRemoteDir(bool isRecursive) {
+    std::unique_ptr<std::vector<std::string>> files = std::make_unique<std::vector<std::string>>();
     sftp_dir dir;
     getConnection();
 
-    // Open directory
-    dir = sftp_opendir(sftp, directory.c_str());
+    // Open base directory
+    dir = sftp_opendir(sftp, Directory.c_str());
 
     if (dir == NULL) {
-        std::cerr << "Directory not found: " << directory << "\nError: " << ssh_get_error(session) << std::endl;
+        std::cerr << "Base directory not found: " << Directory << "\nError: " << ssh_get_error(session) << std::endl;
         disconnect();
-        return std::vector<sftp_attributes>();
+        return nullptr;
     }
 
-    std::vector<sftp_attributes> filesAttrs;
+    // lambda function to loop through subdirectories if recursive and add all pdf files
+    std::function<void(const std::string&)> readDirectory = [&](const std::string& subDirectory) {
+        sftp_dir subdir = sftp_opendir(sftp, subDirectory.c_str());
+        if (subdir == NULL) {
+            return;
+        }
 
-    // Read directory
-    sftp_attributes attributes;
-    while ((attributes = sftp_readdir(sftp, dir)) != NULL) {
-        filesAttrs.push_back(attributes);
-    }
+        sftp_attributes attributes;
+        while ((attributes = sftp_readdir(sftp, subdir)) != NULL) {
+            std::string fileName = attributes->name;
 
-    // Check for errors
-    if (!sftp_dir_eof(dir)) {
-        std::cerr << "Can't list directory: " << ssh_get_error(session) << std::endl;
-        sftp_closedir(dir);
-        disconnect();
-        return std::vector<sftp_attributes>();
-    }
+            if (fileName == "." || fileName == "..") {
+                continue;
+            } else if (fileName.substr(fileName.length() - 3, 3) == "pdf") {
+                files->push_back(subDirectory + fileName);
 
-    sftp_closedir(dir);
+                #ifdef DEBUG
+                    std::cout << "FtpConnection::getRemoteDir: Found file: " << files->back() << std::endl;
+                #endif
+                
+            } else if (attributes->permissions & S_IFDIR && isRecursive) {
+                readDirectory(subDirectory + fileName);
+            }
+        }
+
+        sftp_closedir(subdir);
+    };
+    // Start traversal from the base directory
+    readDirectory(Directory);
     disconnect();
-    return filesAttrs;
+    return std::move(files);
 }
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email ( at ) simonboettger . de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -1,6 +1,7 @@
 #ifndef PARSEURL_H
 #define PARSEURL_H
 
+#include <iostream>
 #include <string>
 #include <QUrl>
 
@@ -26,17 +27,18 @@ public:
     
     std::string Directory() const;
     void Directory(const std::string Directory);
-    
-    std::string FileDir () const {return directory + filename;};
 
     std::string Filename() const;
     void Filename(const std::string Filename);
-    
+
+    std::string FileDir () const;
+    void FileDir (const std::string FileDir);
+        
     std::string RawFilename() const;
     void RawFilename(const std::string RawFilename);
-    
+
     std::string Url();
-    void Url(const std::string Url);
+    void Url(std::string Url);
     
     QUrl qUrl();
 

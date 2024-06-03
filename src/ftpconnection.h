@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <libssh/libssh.h>
 #include <libssh/sftp.h>
+#include <Magick++.h>
 #include "parseurl.h"
 #include "settings.h"
 #include "scan2ocr.h"
@@ -16,9 +17,11 @@ private:
     ssh_session session {nullptr};
     sftp_session sftp {nullptr};
     std::string RemoteHost {""};
-    int Port = 22;
-    std::string username {""};
-    std::string ftpPassword {""};
+    int Port {22};
+    const std::string Filename {""};
+    const std::string Directory {""};
+    std::string Username {""};
+    std::string FtpPassword {""};
     
     void getConnection();
     void disconnect();
@@ -27,11 +30,11 @@ public:
     FtpConnection(const ParseUrl &Url);
     ~FtpConnection();
 
-    bool deleteFile(const std::string &url);
+    bool deleteFile();
     bool connected = false;
-    const std::string getFile(const std::string filename, const std::string directory);
+    std::unique_ptr<Magick::Blob> getFile();
 
-    std::vector<sftp_attributes> getRemoteDir(std::string directory);
+    std::unique_ptr<std::vector<std::string>> getRemoteDir(bool isRecursive);
 };
 
 #endif // FTPCONNECTION_H

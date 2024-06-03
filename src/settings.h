@@ -21,67 +21,86 @@
 #include <QSettings>
 #include <QDir>
 #include <QMessageBox>
+#include <QFileDialog>
 
 class Settings {
 
 public:
-
     enum class Language {
         deu,
         eng
     };
 
-    struct s_networkProfile {
+    Settings();
+    void readValues();
+    void saveValues();
+
+    /************ Network Profiles ************/
+    struct networkProfile {
         std::string name;
-        bool isDefault;
+        bool isDefault {true};
         std::string documentProfileName;
+        int documentProfileIndex;
         ParseUrl url;
+
+        bool operator!=(const networkProfile& other) const {
+            return (name != other.name);
+        }
+    };
+    networkProfile noNetworkProfile {
+        .name = "no host",
+        .isDefault = false,
+        .documentProfileName = "",
+        .documentProfileIndex = 0,
+        .url = ParseUrl("file:///nohost:0/nodirectory/nofile")
     };
 
-    struct s_documentProfile {
-        std::string name;
-        bool isActive;
+    Settings::networkProfile *NetworkProfile(unsigned int index);
+    void addNetworkProfile(Settings::networkProfile profile);
+    void removeNetworkProfile(unsigned int index);
+    const int networkProfileCount() { return networkProfiles.size(); }
+
+    /************ Document Profiles ************/
+    struct documentProfile {
+        std::string name {"default"};
         Language language {Language::deu};
         int resolution {600};
-        float thresholdValue {0.993};
+        float thresholdValue {0.993f};
         bool isColored {false};
+
+        bool operator!=(const documentProfile& other) const {
+            return (name != other.name);
+        }
     };
 
-    std::vector<Settings::s_networkProfile> networkProfiles;
-    std::vector<s_documentProfile> documentProfiles;
-
-    std::unique_ptr<Settings::s_documentProfile> activeDocumentProfile = std::make_unique<Settings::s_documentProfile>(Settings::s_documentProfile{
-        "default",
-        false,
-        Settings::Language::deu,
-        600,
-        0.993,
-        false
-    });
-
-    struct s_ProfileElement {
-        std::string Element;
-        bool isNumerical;
-        bool isRequired;
+    Settings::documentProfile noDocumentProfile {
+        .name = "no profile",
+        .language = Settings::Language::deu,
+        .resolution = 600,
+        .thresholdValue = 0.993f,
+        .isColored = false
     };
 
-    QSettings settings;
+    Settings::documentProfile *DocumentProfile(unsigned int index);
+    void addDocumentProfile(Settings::documentProfile profile);
+    void removeDocumentProfile(unsigned int index);
+    void setDefaultDocumentProfile(unsigned int index);
 
-    std::vector<Settings::s_networkProfile> getNetworkProfiles();
-    std::vector<Settings::s_documentProfile> getDocumentProfiles();
+    const int documentProfileCount() { return documentProfiles.size(); }
 
-    std::string getDestinationDir();
+    /************ Paths ************/
+    void DestinationDir(const QString &dir);
+    QString DestinationDir() { return m_destinationDir; }
 
-    std::string getSSHKeyPath();
+    void SSHKeyPath(const QString &path);
+    QString SSHKeyPath() { return m_sshKeyPath; };
 
     std::string TmpDir() {
         return std::filesystem::temp_directory_path().string() + "/";
     };
 
-    int resolution();
-
     std::string language() {
-        switch (activeDocumentProfile->language) {
+        switch (documentProfiles[0]->language) {
             case Language::deu:
                 return "deu";
             case Language::eng:
@@ -90,13 +109,22 @@ public:
                 return "deu";
         };
     }
-    
-    float thresholdValue() { return activeDocumentProfile->thresholdValue; }
 
-    bool isColored() { return activeDocumentProfile->isColored; }
+    int resolution () { return documentProfiles[0]->resolution; }
+    float thresholdValue() { return documentProfiles[0]->thresholdValue; }
+    bool isColored() { return documentProfiles[0]->isColored; }
+
+private:
+    QSettings settings;
+
+    std::vector<std::unique_ptr<Settings::networkProfile>> networkProfiles;
+    std::vector<std::unique_ptr<documentProfile>> documentProfiles;
+
+    QString m_destinationDir;
+    QString m_sshKeyPath;
 };
 
-class SettingsUI : public QWidget, public Settings
+class SettingsUI : public QWidget
 /*
     Class to manage program settings:
     - Tab Network profiles
@@ -139,20 +167,26 @@ private slots:
     void clickedOK();
 
     void addNetworkProfile();
-    void removeNetworkProfile();
+    void removeNetworkProfile ();
     void setDefaultNetworkProfile();
 
+    void editNetworkProfile(QListWidgetItem *item);
+    void updateNetworkProfileName(QListWidgetItem *item);
     void changedNetworkProfile(int currentRow);
 
     void addDocumentProfile();
     void removeDocumentProfile();
-
+    void setDefaultDocumentProfile();
+    void editDocumentProfile(QListWidgetItem *item);
+    void updateDocumentProfileName(QListWidgetItem *item);
+    void updateDocumentProfiles(int index);
     void changedDocumentProfile(int currentRow);
 
     void setStepValue(int value);
     void updateVector();
 
 private:
+    Settings settings;
     
     //UI
     void createNetworkTab();
@@ -184,8 +218,7 @@ private:
     QPushButton pbRemove;
     QPushButton pbSetDefault;
 
-    std::vector<s_networkProfile> networkProfiles;
-    void setNetworkProfiles();
+    void loadNetworkProfiles();
 
     // Document Tab
     QWidget qDocumentWidget {&qtwSettings};
@@ -205,26 +238,27 @@ private:
     QPushButton pbRemoveDocumentProfile;
     QPushButton pbSetDefaultDocumentProfile;
 
-    std::vector<s_documentProfile> documentProfiles;
-    void setDocumentProfiles();
+    void loadDocumentProfile();
 
     // Path Tab
     QWidget qPathWidget {&qtwSettings};
     QGridLayout layoutPath {&qPathWidget};
-    QLabel lblDestinationDir {tr("Destination directory:")};
+    QLabel lblDestinationDir {tr("Default directory where to put files:")};
     QLineEdit leDestinationDir;
-    QLabel lblSSHDir {tr("SSH key path:")};
+    QLabel lblSSHDir {tr("Directory where to find SSH keys for passwordless login:")};
     QLineEdit leSSHDir;
     QToolButton btDestinationDir;
     QToolButton btSSHDir;
 
     void setPaths();
+    void getPaths();
+    template <typename T> void removeItem(QListWidget &listWidget, std::vector<T> &profileList);
 
     // Validator functions
     bool validateNetworkProfile();
     bool validateDocumentProfile();
     bool validatePath(const QString Path);
 
-    void accepted();
+    void accepted(); // called when OK is clicked and values are checked
 
 };

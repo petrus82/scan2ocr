@@ -1,349 +1,246 @@
 #include "pdffile.h"
+PdfFile::PdfFile(ParseUrl Url, QObject *parent) : QObject(parent), m_Url(Url), m_parent(parent) {
+    if (parent != nullptr) {
+        #ifdef DEBUG
+            std::cout << "Connecting PdfFile::statusChange and finished (" << this << ") to parent (" << parent << ")" << std::endl;
+        #endif
 
-// ************************************************************************************************
-//                                  PdfFileList class
-// ************************************************************************************************
-//
-// Class for managing pdf files. It has a list of pointers to instances of Class PdfFile
-// addFiles adds files either locally ore if they are on a sftp server it first transfers them
-// to a lokal tempfile.
-// removeFile takes care of removing all tempfiles and the original pdf file either locally or on
-// the sftp server
-// PdfFile represents one pdf file. This class manages the processing of each pdf file
-//
-// ************************************************************************************************
-
-/*
-Data flow:
-source:   local file                        sftp file
-            |                                   |   
-            |                                local copy
-            |                                   |
-            ------- read copy into memory -------
-            |                                   |    
-          remove empty page, transcode to tiff g4
-            |                                   |    
-            --- write temp file for tesseract----
-            |                                   |
-            ------------ add ocr layer ---------
-            |                                   |   
-            ------ guess possible filename -----
-            |                                   |   
-             read preview of pdf from temp file 
-            |                                   |
-            -- user chooses definite filename --
-            |                                   |
-destination: move temp file to definite filename
-            |                                   |
-cleanup:    ----------- remove temp file --------
-            |                                   |
-            |                           remove local copy
-            |                                   |
-        remove local file                   remove sftp file
-
-local file and sftp file are stored by using a url (file:/// or sftp://)
-local copy is equal to local file if the source pdf is a local file. 
-Its format is in the form /directory/filename
-*/
-
-PdfFileList::~PdfFileList() {
-    pdfFiles.clear();
-}
-
-bool PdfFileList::addFiles(ParseUrl &Url) {
-    int numThreads {0};
-    std::vector<std::thread> threads;
-
-    if (Url.Scheme() == "file") {
-        // Get lokal files
-        if (Url.Filename() != "") {
-            // Add single local file
-
-            // each new file requires a number of processing steps equal to c_statusIncrement
-            // if one step of one pdf file is ahead, increment status by 1
-            // status is updated in PdfFile using m_Status which is passed by ref
-            maxStatus += c_statusIncrement;
-            emit newFileAdded();
-
-            pdfFiles.emplace_back(std::make_unique<PdfFile>(Url, Url.FileDir(), m_Status));
-            emit newFileComplete(Url.Filename());
-            
-            emit finishedProcessing();
-            return true;
-        }
+        QObject::connect(this, SIGNAL(statusChange()), parent, SLOT(statusUpdate()), Qt::DirectConnection);
+        QObject::connect(this, SIGNAL(finished()), parent, SLOT(filesProcessed()), Qt::DirectConnection);
+    }
+    #ifdef DEBUG
         else {
-            // Get whole directories including subdirectories recursesively
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(Url.Directory())) {
-                if (entry.path().extension() == ".pdf") {
-                    
-                    maxStatus += c_statusIncrement;
-                    emit newFileAdded();
-                    QCoreApplication::processEvents();
-
-                    ParseUrl newUrl ("file://" + entry.path().string());
-
-#ifndef DEBUG
-                    auto lambdaThread = [=]()-> void{
-#endif
-                        pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, newUrl.FileDir(), m_Status));
-                        emit newFileComplete(entry.path().filename().string());
-#ifndef DEBUG
-                    };
-                    threads.push_back(std::thread(lambdaThread));
-#endif
-                }
-            }
+            std::cout << "PdfFile initialized with parent nullptr " << std::endl;
         }
-    }
-    else {
-        // Scheme will be sftp, so we call a remote computer
-        if (Url.Filename() != "") {
-            // Only a single remote File
-            maxStatus += c_statusIncrement;
-            emit newFileAdded();
-
-            FtpConnection ftpConnection (Url);
-
-            std::string filename = ftpConnection.getFile(Url.Filename(), Url.Directory());
-            pdfFiles.emplace_back(std::make_unique<PdfFile>(Url, filename, m_Status));
-            emit newFileComplete(Url.Filename());
-
-            emit finishedProcessing();
-            return true;
-        }
-        else {
-            // Remote directory(ies)
-             // Loop through all pdf files in the given RemoteDirectory and all its subdirectories
-            FtpConnection ftpConnection(Url);
-
-            const std::string directory = Url.Directory();
-            std::vector<sftp_attributes> sftpAttributes = ftpConnection.getRemoteDir(directory);
-
-            // Check if we have at least one directory returned, otherwise return failure
-            if (sftpAttributes.empty()) {
-                return false;
-            }
-
-            const std::string fileDirectory = directory;
-            for(auto& attr : sftpAttributes) {
-                // Make sure we don't step into the current directory again or the parent directory,
-                // but we also checked all subdirectories
-                if (attr->type == SSH_FILEXFER_TYPE_DIRECTORY && std::strcmp(attr->name, ".") != 0 && std::strcmp(attr->name, "..") != 0) {
-                    // Found subdirectory, loop through it using recursion
-                    const std::string subdirectory = attr->name;
-                    ParseUrl newUrl (Url);
-                    newUrl.Directory(newUrl.Directory() + attr->name + "/");
-                    addFiles (newUrl);
-                }
-                else if (attr->type == SSH_FILEXFER_TYPE_REGULAR) {
-                    // Found a file, if pdf file add it to list
-                    std::string filename = attr->name;
-                    
-                    // get file from sftp server if pdf
-                    if (filename.size() > 3 && filename.substr(filename.length() - 3) == "pdf"){
-#ifndef DEBUG
-                        auto lambdaThread = [=]()-> void{
-#endif
-                            maxStatus += c_statusIncrement;
-                            emit newFileAdded();
-
-                            // We are in a new thread, get a new ftpConnection                            
-                            FtpConnection ftpConThread(Url);
-
-                            const std::string tmpFileName = ftpConThread.getFile(filename, fileDirectory);
-                            ParseUrl newUrl(Url);
-                            newUrl.Filename(filename);
-                            newUrl.Directory(fileDirectory);
-                            pdfFiles.emplace_back(std::make_unique<PdfFile>(newUrl, tmpFileName, m_Status));
-
-                            emit newFileComplete(filename);
-#ifndef DEBUG
-                        };
-
-                        threads.push_back(std::thread(lambdaThread));
-#endif
-                    }
-                }
-            } 
-        }
-    }
-#ifndef DEBUG
-    for (auto& thread : threads) {
-        thread.join();
-    }
-#endif
-    emit finishedProcessing();
-    return true;
+    #endif
 }
 
-bool PdfFileList::removeFile(int Element) {
-    // Check pdfFiles[Element]
-    if (pdfFiles[Element] == nullptr) {
-        return false;
-    }
-
-    // First delete sourcefile
-    ParseUrl Url = pdfFiles[Element]->getUrl();
-    if (Url.Scheme() == "file") {
-        std::filesystem::path localFile {Url.FileDir()};
-        try {
-            std::filesystem::remove(localFile);
-        } catch (std::filesystem::filesystem_error& e) {
-            QMessageBox::critical(nullptr, tr("Error Deleting file"), QString::fromStdString(e.what()));
-            return false;
-        }
-    }
-    else if (Url.Scheme() == "sftp") {
-
-        FtpConnection ftpConnection (Url);
-        ftpConnection.deleteFile(Url.FileDir());
-    }
-
-    // remove from pdfFileList
-    pdfFiles.erase(pdfFiles.begin() + Element);
-    return true;
-}
-
-// *******************************************************************************************************
-//                                          PdfFile class
-// *******************************************************************************************************
-//
-// It takes the url to a local pdf file
-// It first removes every empty page
-// then it converts the encoding to black and white with tiff g4
-// it adds an ocr layer
-// and guesses a possible filename based on the largest line of text on the first page
-
-PdfFile::PdfFile(ParseUrl Url, const std::string &localCopy, int &status, QObject *parent) : QObject(parent), m_Url(Url), m_LocalCopy(localCopy) {
-    if (ptr_cfMain != nullptr) {
-        QObject::connect(this, SIGNAL(statusChange()), ptr_cfMain, SLOT(statusUpdate()), Qt::DirectConnection);
-    }
+void PdfFile::initialize(){
+    #ifdef DEBUG
+        std::cout << "PdfFile::initialize on: " << m_Url.Url() << std::endl;
+    #endif 
     
-    // Read PdfFile into Memory
+    m_Status++;
+    emit statusChange();
+    bool retVal = readFile(m_Url);
+    
+    m_Status++;
+    emit statusChange();
+    retVal =removeEmptyPages();
+    
+    m_Status++;
+    emit statusChange();
+    retVal = transcodeFile();
+    
+    m_Status++;
+    emit statusChange();
+    retVal = ocrFile();
+
+    m_Status++;
+    emit statusChange();
+    m_possibleFileName = getFileName();
+
+    emit finished();
+    #ifdef DEBUG
+        std::cout << "PdfFile::finished from " << this << std::endl;
+    #endif
+}
+
+bool PdfFile::readFile(ParseUrl Url) {
+    // Read local PdfFile into Memory
     Magick::ReadOptions options;
     int resolution {settings.resolution()};
-    options.density(Magick::Geometry(resolution, resolution));        // Set Resolution of input image to 600 dpi
-    Magick::readImages(&pdfImgList, m_LocalCopy, options);
+    options.density(Magick::Geometry(resolution, resolution));
     
-    status++;
-    emit statusChange();
-    removeEmptyPage();
-
-    status++;
-    emit statusChange();
-    transcodeToTiff();
-
-    status++;
-    emit statusChange();
-    ocrPdf();
-
-    status++;
-    emit statusChange();
-    m_possibleFileName = getPossibleFileName();
-}
-
-bool PdfFile::removeEmptyPage() {
-    for (auto it = pdfImgList.begin(); it != pdfImgList.end();)
-    {
-        Magick::Image &image = *it;
-        Magick::ImageStatistics Statistics = image.statistics();
-        double mean_val = Statistics.channel(MagickCore::PixelChannel()).mean();
-        mean_val /= 1 << 16;
-        if (mean_val > settings.thresholdValue())
-        {
-            it = pdfImgList.erase(it);
-        }
-        ++it;
+    if (Url.Scheme() == "file") {
+        Magick::readImages(&m_PdfImgList, m_Url.Directory() + "/" + m_Url.Filename(), options);
     }
+    else {
+        std::unique_ptr<Magick::Blob> remoteFilePtr = ftpConnection.getFile();
+        if (remoteFilePtr != nullptr) {
+            Magick::readImages(&m_PdfImgList, *remoteFilePtr, options);
+        }
+    }
+    
     return true;
 }
 
-bool PdfFile::transcodeToTiff() {
+bool PdfFile::removeEmptyPages() {
+    m_PdfImgList.erase(
+        std::remove_if(
+            m_PdfImgList.begin(),
+            m_PdfImgList.end(),
+            [this](Magick::Image& image) {
+                Magick::ImageStatistics statistics = image.statistics();
+                double mean_val = statistics.channel(MagickCore::PixelChannel()).mean() / (1 << 16);
+                return mean_val > settings.thresholdValue();
+            }
+        ),
+        m_PdfImgList.end()
+    );
+    return true;
+}
 
-    for (auto &image : pdfImgList)
+bool PdfFile::transcodeFile() {
+    const bool isColored {settings.isColored()};
+    for (auto &image : m_PdfImgList)
     {
         // Turn into black and white image if isColored == false
-        if (settings.isColored() == false) {
+        if (!isColored) {
             image.autoThreshold(MagickCore::AutoThresholdMethod::OTSUThresholdMethod);
             image.threshold(settings.thresholdValue());
 
             // Change encoding to Tiff G4
             image.magick("TIFF");
+            image.depth(8);
             image.compressType(Magick::CompressionType::Group4Compression);
         }
-        // If isColored == true, don't touch encoding
-        // TODO: Test if tesseract && poppler can handle jpeg encoded images
+        else {
+            // If isColored == true
+            image.depth(8);
+            image.compressType(Magick::CompressionType::JPEGCompression);
+        }
+        
     }
     return true;
 }
 
-bool PdfFile::ocrPdf() {
+bool PdfFile::ocrFile() {
+    #ifdef DEBUG
+        std::cout << "PdfFile::ocrFile() on: " << m_Url.Url() << std::endl;
+    #endif
+
     tesseract::TessBaseAPI ocr;
     ocr.Init(NULL, settings.language().c_str(), tesseract::OEM_LSTM_ONLY);
 
-    // Tesseract always adds .pdf to the file name
-    // To have the output of tesseract into m_tempFileName remove the .pdf from m_tempFileName
-    const std::string &InputOCR = m_tempFileName.substr(0, m_tempFileName.find_last_of("."));
-    Magick::writeImages(pdfImgList.begin(), pdfImgList.end(), InputOCR, true);
-
     // Set page segmentation mode (default option is best): ocr.SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_BLOCK);
-    tesseract::TessPDFRenderer *renderer = new tesseract::TessPDFRenderer(InputOCR.c_str(), ocr.GetDatapath());
+    constexpr bool textOnly {false};
+    const std::string outputBase {"/tmp/" + m_Url.RawFilename()};
+    
+    tesseract::TessPDFRenderer *renderer = new tesseract::TessPDFRenderer(outputBase.c_str(), ocr.GetDatapath(), textOnly);
+    //PdfStream *pdfStreamRenderer = new PdfStream(outputBase.c_str(), ocr.GetDatapath(), textOnly);
 
-    // Write OCRPDF to OutputFile
-    bool retVal = ocr.ProcessPages(InputOCR.c_str(), NULL, 0,  renderer);
-    if (!retVal) {
-        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error writing output pdf ")) + QString::fromStdString(m_tempFileName));
+    const std::string inputFileName {"/tmp/" + m_Url.RawFilename()+ ".tiff"};
+    constexpr char *retryConfig {nullptr};
+    constexpr int timeout_millisec {0};
+    constexpr bool adjoin {true};
+
+    // Quite nasty hack with tempfiles because tessPDFRenderer does not take any memory objects or writes a pdf stream to memory
+    // Magick::writeImages(m_PdfImgList.begin(), m_PdfImgList.end(), inputFileName, adjoin);
+    // bool retVal = ocr.ProcessPages (inputFileName.c_str(), retryConfig, timeout_millisec, renderer);
+    
+    // Make ocr on pix object from TIFF 
+    Pix *pix {nullptr};
+    Magick::Blob rawData;
+    Magick::writeImages(m_PdfImgList.begin(), m_PdfImgList.end(), &rawData, adjoin);
+
+    const l_uint8 *imgData = reinterpret_cast<const l_uint8*>(rawData.data());
+    size_t size = rawData.length();
+    size_t offset = 0;
+    int page {0};
+    
+    renderer->BeginDocument(m_FileName.c_str());
+    
+    // only works for tiff files, implement sth. for jpeg if isColored == true
+    if (settings.isColored()) {
+        for (;; ++page) {
+            pix = pixReadMemFromMultipageTiff(imgData, size, &offset);
+            if (pix == nullptr) {
+                break;
+            }
+            if (offset || page > 0) {
+            // Only print page number for multipage TIFF file.
+            std::cout << "Page %d\n" << page + 1 << std::endl;
+            }
+            auto page_string = std::to_string(page);
+            
+            ocr.SetImage(pix);
+            pixDestroy(&pix);
+            bool failed {false};
+            if (!std::unique_ptr<const tesseract::PageIterator>(ocr.AnalyseLayout())) {;
+                failed = true;
+            }
+            failed = ocr.Recognize(nullptr) < 0;
+
+            if (renderer && !failed) {
+                failed = !renderer->AddImage(&ocr);
+            }
+            if (failed) {
+                QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error writing pdf stream")) + QString::fromStdString(tempFileName));
+                return false;
+            }
+
+            if (!offset) {
+            break;
+            }
+        }
+    }
+    else {
+        pix = pixReadMem(imgData, size);
+        ocr.SetImage(pix);
+        pixDestroy(&pix);
+
+        bool failed {false};
+        if (!std::unique_ptr<const tesseract::PageIterator>(ocr.AnalyseLayout())) {;
+            failed = true;
+        }
+        failed = ocr.Recognize(nullptr) < 0;
+
+        if (renderer && !failed) {
+            failed = !renderer->AddImage(&ocr);
+        }
+        if (failed) {
+            QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error writing pdf stream")) + QString::fromStdString(tempFileName));
+            return false;
+        }
+    }
+    renderer->EndDocument();
+
+    //read tempfile into buffer
+    pdfBuffer->open(QIODevice::ReadWrite);
+    QFile file(tempFileName.c_str());
+    if(!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to open temporary pdf file for reading: " << tempFileName.c_str();
         return false;
     }
+    QByteArray data = file.readAll();
+    pdfBuffer->write(data);
 
-    // Remove Inputfile, keep HOCR File which should now be equal to m_tempFileName (Filename + .pdf)
-    std::filesystem::remove(InputOCR);
-
-/*     // Andere Möglichkeit über pixObject:
-    Alles in einer Schleife, Funktionen zusammenlegen. Fortschritt über Seite 1/n
-    #include <leptonica/allheaders.h>
-    Magick::Blob blob;
-    Pix* pixImage; 
-
-    for (auto& image : pdfImgList) {
-        image.write(&blob);
-        pixImage = pixReadMem(reinterpret_cast<const l_uint8*>(blob.data()), blob.length());
-        ocr.SetImage(pixImage);
-        ocr.Recognize(nullptr);
-        renderer->AddImage(&ocr);
-        pixDestroy(&pixImage);
-    }
-    renderer->EndDocument(); */
-
-    delete renderer;
+    // Now cleanup the mess we left on /tmp
+    file.close();
+    pdfBuffer->close();
+    std::remove(tempFileName.c_str());
+ 
     ocr.End();
+    pixDestroy(&pix);
+    delete renderer;
     return true;
 }
 
-std::string PdfFile::getPossibleFileName() {
-
-    std::unique_ptr<poppler::document> pdfDoc(poppler::document::load_from_file (m_tempFileName.c_str()));
-    
+std::string PdfFile::getFileName() {
+    #ifdef DEBUG
+        std::cout << "PdfFile::getFileName() on: " << m_Url.Url() << std::endl;
+    #endif
+    pdfBuffer->open(QIODevice::ReadOnly);
+    std::unique_ptr<poppler::document> pdfDoc(poppler::document::load_from_raw_data (pdfBuffer->data(), pdfBuffer->size()));
+    pdfBuffer->close(); 
     if (!pdfDoc) {
-        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error opening ")) + QString::fromStdString(m_tempFileName));
-        return "";
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error reading file content")));
+        return nullptr;
     }
 
     // Get the first page of the PDF
     std::unique_ptr<poppler::page> firstPage(pdfDoc->create_page(0));
-
     if (!firstPage) {
-        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error getting first page")));
-        return "";
+        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error reading first page")));
+        return nullptr;
     }
-
-    double font_size = 0;
-    double largestFontSize = 0.0;
-    std::string lineWithLargestFontSize="";
 
     // Check for the largest line of text which does not end with a "." character and has more than 2 characters,
     // which hopefully will be in the majority of cases some descriptive filename
-
+    double font_size {0};
+    double largestFontSize {0.0};
+    std::string lineWithLargestFontSize {""};
     for (const auto& text_item : firstPage->text_list(1))   //opt_flag has to be 1 to get the fontsize
     {
         font_size = text_item.get_font_size();
@@ -356,7 +253,7 @@ std::string PdfFile::getPossibleFileName() {
 
     // Check for the first occuring date in the format dd.mm.yyyy
     // which can be the date of the letter or invoice
-    std::string text = firstPage->text().to_latin1().c_str();
+    std::string text {firstPage->text().to_latin1().c_str()};
     std::regex pattern("(0[1-9]|[1-2][0-9]|3[0-1])\\.(0[1-9]|1[0-2])\\.(19[0-9]{2}|20[0-9]{2}|2100)");
 
     // Search for a date in the text
@@ -388,13 +285,134 @@ std::string PdfFile::getPossibleFileName() {
     }
 
     possibleFileName += ".pdf";
+    
+    #ifdef DEBUG
+        std::cout << "PdfFile::getFileName(), possibleFileName: " << possibleFileName << std::endl;
+    #endif
 
     return possibleFileName;
 }
 
+bool PdfFile::removeFile() {
+    if (m_Url.Scheme() == "file") {
+        #ifdef DEBUG
+            std::cout << "PdfFile::removeFile: removing file:  " << m_Url.FileDir() << std::endl;
+        #else
+            if (std::remove(m_Url.FileDir().c_str()) != 0) {
+                QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error deleting file ")) + QString::fromStdString(m_Url.FileDir()));
+                return false;
+            }    
+        #endif
+    }
+    else {
+        FtpConnection ftpConnection (m_Url);
+        #ifdef DEBUG
+            std::cout << "PdfFile::removeFile: removing file: " << m_Url.Url() << std::endl;
+        #else
+            if (!ftpConnection.deleteFile()) {
+                QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error deleting file ")) + QString::fromStdString(m_Url.FileDir()));
+                return false;
+            }
+        #endif
+    }
+    return true;
+}
+
+bool PdfFile::saveToFile(const std::string fileName) {
+    #ifdef DEBUG
+        std::cout << "PdfFile::saveToFile on: " << fileName << std::endl;
+    #endif
+    
+    if (std::filesystem::exists(fileName)) {
+        QMessageBox msgBox;
+        msgBox.setText(QString::fromStdString(fileName));
+        msgBox.setInformativeText(tr("File already exists. Overwrite?"));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgBox.setDefaultButton(QMessageBox::No);
+        int ret = msgBox.exec();
+        if (ret == QMessageBox::No) {
+            return false;
+        }
+    }
+    
+    pdfBuffer->open(QIODevice::ReadOnly);
+    QByteArray data = pdfBuffer->readAll();
+    pdfBuffer->close();
+    std::ofstream outputFile(fileName, std::ios::binary);
+    if (!outputFile) {
+        qWarning() << "Failed to open file for writing: " << fileName.c_str();
+        return false;
+    }
+    outputFile.write(data.data(), data.size());
+    outputFile.close();
+    return true;
+}
+
+std::shared_ptr<QIODevice> PdfFile::returnFileContent() {
+    #ifdef DEBUG
+        std::cout << "PdfFile::returnFileContent on: " << m_Url.Url() << std::endl;
+    #endif
+    pdfBuffer->open(QIODevice::ReadOnly);
+    return pdfBuffer;
+}
+
+Directory::Directory (ParseUrl Url, QObject *parent, bool isRecursive) : QObject (parent), m_Url(Url), p_cfMain (parent), m_isRecursive (isRecursive) {
+
+}
+
+void Directory::initialize() {
+    #ifdef DEBUG 
+        std::cout << "Directory(): New Directory: " << m_Url.Url() << " p_cfMain: " << p_cfMain << " m_isRecursive: " << m_isRecursive << std::endl;
+    #endif
+    
+    auto addPdf = [&](const auto& entry) {
+        if (entry.path().extension() == ".pdf") {
+            ParseUrl new_Url (m_Url);
+            new_Url.FileDir(entry.path().string());
+            std::shared_ptr<ParseUrl>ptr_Url = std::make_shared<ParseUrl>(new_Url);
+            emit foundNewFile(ptr_Url);
+        }
+    };
+
+    if (m_Url.Scheme() == "file") {
+        // Screen lokal directory for subdirectories and pdf files
+        // Create an instance of PdfFile for each .pdf file and an instance of Directory for each subdirectory
+        if (m_isRecursive) {
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(m_Url.Directory())) {
+                addPdf(entry);
+            }
+        }   
+        else { // No recursion through subdirs
+            for (const auto& entry : std::filesystem::directory_iterator(m_Url.Directory())) {
+                addPdf(entry);
+            }
+        }       
+    }
+    else {
+        // Screen remote directory for subdirectories and pdf files and create instances of PdfFile
+        FtpConnection ftpConnection (m_Url);
+        std::unique_ptr<std::vector<std::string>> remoteDirPtr = ftpConnection.getRemoteDir(m_isRecursive);
+        if (remoteDirPtr != nullptr) {
+            for (std::string entry: *(remoteDirPtr)) {
+                // Construct new Url on m_Url with entry, which is the directory and filename (= FileDir)
+                std::shared_ptr<ParseUrl> ptr_newUrl = std::make_shared<ParseUrl> (m_Url);
+                ptr_newUrl->FileDir(entry);
+                #ifdef DEBUG
+                    std::cout << "Directory(), entry: " << entry << std::endl;
+                    std::cout << "Directory(), found new file with Url: " << ptr_newUrl->Url() << std::endl;
+                    std::cout << "Creating new instance of PdfFile with p_cfMain to " << p_cfMain << std::endl;
+                    std::cout << "foundNewFile from Directory()" << std::endl;
+                #endif
+                emit foundNewFile(ptr_newUrl);
+            }    
+        }
+        
+    }
+}
+
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email ( at ) simonboettger . de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -408,4 +426,4 @@ std::string PdfFile::getPossibleFileName() {
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
-    */
+*/
