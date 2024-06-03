@@ -32,7 +32,7 @@ jobs:
       -   name: Install dependencies
           run: |
             sudo apt-get update -yq &&
-            sudo apt-get install libmagick++-dev libssh-dev libtesseract-dev libpoppler-cpp-dev
+            sudo apt-get install libssh-dev libtesseract-dev libpoppler-cpp-dev extra-cmake-modules
             
       -   name: Install ImageMagick 7
           run:  |
