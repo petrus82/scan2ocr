@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Find source files
+        run: find .
+        
       - name: Install QT6
         uses: jurplel/install-qt-action@v3
       
@@ -31,13 +34,22 @@ jobs:
           run: |
             sudo apt-get update -yq &&
             sudo apt-get install libmagick++-dev libssh-dev libtesseract-dev libpoppler-cpp-dev
-          
+            
+      -   name: Install ImageMagick 7
+          run:  |
+                wget https://github.com/ImageMagick/ImageMagick/archive/refs/tags/7.1.0-31.tar.gz && \
+                tar xzf 7.1.0-31.tar.gz && \
+                rm 7.1.0-31.tar.gz && \
+                apt-get clean && \
+                apt-get autoremove
+
+                RUN sh ./ImageMagick-7.1.0-31/configure --prefix=/usr/local --with-bzlib=yes --with-fontconfig=yes --with-freetype=yes --with-gslib=yes --with-gvc=yes --with-jpeg=yes --with-jp2=yes --with-png=yes --with-tiff=yes --with-xml=yes --with-gs-font-dir=yes && \
+                make -j && make install && ldconfig /usr/local/lib/
+        
       - name: Configure CMake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
         # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
         run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-      - name: Find source files
-        run: find .
       
       - name: Prepare for Build
         run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
