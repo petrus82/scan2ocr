@@ -90,7 +90,8 @@ void FtpConnection::disconnect() {
 bool FtpConnection::deleteFile() {
     getConnection();
 
-    const char *cUrl = (Directory + "/" + Filename).c_str();
+    std::string urlString = Directory + "/" + Filename;
+    const char *cUrl = urlString.c_str();
 
     sftp_file file = sftp_open(sftp, cUrl, O_WRONLY, 0);
     if (file == NULL) {
