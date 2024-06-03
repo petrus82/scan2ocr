@@ -8,12 +8,19 @@ set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG  "-g")
 
+find_package(ECM REQUIRED NO_MODULE)
+set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
+
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets PdfWidgets LinguistTools)
 find_package(ImageMagick COMPONENTS Magick++)
-find_package(libssh)
+find_package(Poppler REQUIRED)
+message(STATUS "Poppler_Cpp_LIBRARIES: ${Poppler_Cpp_LIBRARIES}")
 
-set(Leptonica_DIR "/usr/lib/cmake/Leptonica")
-set(Tesseract_INCLUDE_DIRS "/usr/include/tesseract")
+find_library(MAGICK_CORE_LIBRARY NAMES libMagickCore-7.Q16HDRI.so PATHS /usr/lib/)
+
+find_library(Leptonica_LIBRARIES NAMES libleptonica.so PATHS /usr/lib/)
+find_library(libssh_LIBRARIES NAMES libssh.so PATHS /usr/lib/)
+find_library(Tesseract_LIBRARIES NAMES libtesseract.so PATHS /usr/lib/)
 
 if (Qt6_VERSION VERSION_GREATER_EQUAL 6.3)
     qt_standard_project_setup()
@@ -23,14 +30,8 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Set the debug flags
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-
-# Add CodeQL options
-# option(ENABLE_CODEQL "Enable CodeQL analysis" OFF)
-# if(ENABLE_CODEQL)
-#  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# endif()
+# Set debug flags
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 set(SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(SOURCE_FILES
@@ -60,22 +61,17 @@ qt6_add_translations(scan2ocr TS_FILES german.ts LUPDATE_OPTIONS -no-obsolete)
 add_dependencies(scan2ocr scan2ocr_lupdate)
 add_dependencies(scan2ocr update_translations)
 
-  #QM_FILES_OUTPUT_VARIABLE qm_files)
-
- # install(FILES ${qm_files} DESTINATION "translations")
-
 target_include_directories(scan2ocr PRIVATE
     ${CMAKE_PROJECT_INCLUDE_DIR}
     ${libssh_INCLUDE_DIRS}
     ${ImageMagick_INCLUDE_DIRS}
+    ${ImageMagick_Magick}
     ${Leptonica_INCLUDE_DIRS}
     ${Tesseract_INCLUDE_DIRS}
-    /usr/include/poppler/cpp
+    ${Poppler_INCLUDE_DIRS}
 )
 
 target_compile_options(scan2ocr PRIVATE
-    -I/usr/include/ImageMagick-7
-    -I/usr/include/poppler/cpp
     -fopenmp
     -DMAGICKCORE_HDRI_ENABLE=1
     -DMAGICKCORE_CHANNEL_MASK_DEPTH=32
@@ -95,24 +91,21 @@ endif()
 
 target_link_libraries(scan2ocr PRIVATE
     ${ImageMagick_LIBRARIES}
+    ${ImageMagick_Magick}
+    ${MAGICK_CORE_LIBRARY}
     ${Leptonica_LIBRARIES}
     ${Tesseract_LIBRARIES}
     ${libssh_LIBRARIES}
+    ${Leptonica_LIBRARIES}
+    ${libssh_LIBRARIES}
     ${Poppler_LIBRARIES}
-    /usr/lib/libpoppler-cpp.so
-    /usr/lib/libtesseract.so
-    /usr/lib/libssh.so
-    /usr/lib/libMagick++-7.Q16HDRI.so
-    /usr/lib/libMagickCore-7.Q16HDRI.so
-    /usr/lib/libMagickWand-7.Q16HDRI.so
-    /usr/lib/libleptonica.so
+    Poppler::Cpp
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
     Qt6::PdfWidgets
 )
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::PdfWidgets)
 install(TARGETS scan2ocr DESTINATION bin)
 
 set(CPACK_PACKAGE_NAME "scan2ocr")
@@ -127,29 +120,4 @@ set(CMAKE_INSTALL_PREFIX /usr)
 set(CPACK_SOURCE_GENERATOR_DISABLED)
 set(CPACK_SOURCE_GENERATOR_TGZ ON)
 
-#install(FILES ${qm_files} DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME})
-
 include(CPack)
-
-# Add CodeQL analysis step
-#if(ENABLE_CODEQL)
-#  find_program(CODEQL_CLI_EXECUTABLE "codeql")
-#  if(CODEQL_CLI_EXECUTABLE)
-#    add_custom_target(codeql
-#      COMMAND ${CODEQL_CLI_EXECUTABLE} database analyze --format=sarif-latest
-#        --output=scan2ocr.sarif -- code-analysis .
-#      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-#      COMMENT "Running CodeQL analysis"
-#    )
-#  else()
-#    message(WARNING "CodeQL CLI not found. Skipping CodeQL analysis.")
-#  endif()
-#endif()
-
-# Debug: cmake -DCMAKE_BUILD_TYPE=Debug .
-# Release: cmake -DCMAKE_BUILD_TYPE=Release .
-# With CodeQL:
-# cmake -DENABLE_CODEQL=ON .
-# cmake --build .
-# cmake --build . --target codeql
-# codeql database create code-analysis --language=cpp --command='cmake --build . --target all --config Release -- -j4'
