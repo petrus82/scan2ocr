@@ -11,6 +11,11 @@ Settings::Settings() {
     readValues();
 }
 
+/**
+ * Reads the saved profile values using QSettings, if no settings are saved yet, returns the default values.
+ *
+ * @throws None
+ */
 void Settings::readValues() {
     // Clear all internal variables
     networkProfiles.clear();
@@ -24,6 +29,7 @@ void Settings::readValues() {
         Settings::networkProfile newNetworkProfile;
         newNetworkProfile.name = profile.toStdString();
         newNetworkProfile.isDefault = settings.value("isDefault").toBool();
+        newNetworkProfile.isRecursive = settings.value("isRecursive").toBool();
         newNetworkProfile.documentProfileName = settings.value("documentProfileName").toString().toStdString();
         newNetworkProfile.documentProfileIndex = settings.value("documentProfileIndex").toInt();
         newNetworkProfile.url = ParseUrl(settings.value("url").toString().toStdString());
@@ -83,6 +89,13 @@ void Settings::readValues() {
     }
 }
 
+/**
+ * Save the current settings to the configuration file.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void Settings::saveValues() {
     settings.clear();
     settings.sync();
@@ -92,6 +105,7 @@ void Settings::saveValues() {
     for (auto &profile : networkProfiles) {
         settings.beginGroup(profile->name);
         settings.setValue("isDefault", profile->isDefault);
+        settings.setValue("isRecursive", profile->isRecursive);
         settings.setValue("documentProfileName", QString::fromStdString(profile->documentProfileName));
         settings.setValue("documentProfileIndex", profile->documentProfileIndex);
         settings.setValue("url", QString::fromStdString(profile->url.Url()));
@@ -121,19 +135,49 @@ void Settings::saveValues() {
 }
 
 /******************** Network Profiles *********************/
+
+/**
+ * Returns a pointer to the network profile at the specified index.
+ *
+ * @param index The index of the network profile to retrieve.
+ *
+ * @return A pointer to the network profile at the specified index. If the index
+ *         is out of bounds, a pointer to a special "no network profile" object
+ *         is returned.
+ *
+ * @throws None
+ */
 Settings::networkProfile *Settings::NetworkProfile(unsigned int index) {
     if (index < networkProfiles.size()) {
-        std::cout << "NetworkProfile:Host: " << networkProfiles[index]->url.Host() << std::endl;
+        #ifdef DEBUG
+            std::cout << "Settings::saveValues:NetworkProfile:Host: " << networkProfiles[index]->url.Host() << std::endl;
+        #endif
         return networkProfiles[index].get();
     } else {
         return &noNetworkProfile;
     }
 }
 
+/**
+ * Adds a new network profile to the list of network profiles.
+ *
+ * @param profile The network profile to add.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void Settings::addNetworkProfile(Settings::networkProfile profile) {
     networkProfiles.emplace_back(std::make_unique<Settings::networkProfile>(profile));
 }
 
+/**
+ * Removes a network profile from the list of network profiles at the specified index.
+ *
+ * @param index The index of the network profile to remove.
+ *
+ * @throws None
+ */
 void Settings::removeNetworkProfile(unsigned int index) {
     if (networkProfiles.size() >= index) {
         networkProfiles.erase(networkProfiles.begin() + index);
@@ -141,6 +185,16 @@ void Settings::removeNetworkProfile(unsigned int index) {
 }
 
 /********************* Document Profiles ******************/
+
+/**
+ * Retrieves a document profile from the list of document profiles based on the provided index.
+ *
+ * @param index The index of the document profile to retrieve.
+ *
+ * @return A pointer to the document profile if found, otherwise a pointer to a default document profile.
+ *
+ * @throws None
+ */
 Settings::documentProfile *Settings::DocumentProfile(unsigned int index) {
     if (documentProfiles.size() > index) {
         return documentProfiles[index].get();
@@ -149,50 +203,90 @@ Settings::documentProfile *Settings::DocumentProfile(unsigned int index) {
     }
 }
 
+/**
+ * Adds a new document profile to the list of document profiles.
+ *
+ * @param profile The document profile to be added.
+ *
+ * @throws None
+ */
 void Settings::addDocumentProfile(Settings::documentProfile profile) {
     documentProfiles.emplace_back(std::make_unique<Settings::documentProfile>(profile));
 }
 
+/**
+ * Removes a document profile from the list of document profiles at the specified index.
+ *
+ * @param index The index of the document profile to remove.
+ *
+ * @throws None
+ */
 void Settings::removeDocumentProfile(unsigned int index) {
     if (documentProfiles.size() >= index) {
         documentProfiles.erase(documentProfiles.begin() + index);
     }
 }
 
+/**
+ * Sets the default document profile.
+ *
+ * @param index the index of the document profile to be set as default
+ *
+ * @throws None
+ *
+ * @return void
+ */
 void Settings::setDefaultDocumentProfile(unsigned int index) {
     if (index > 0 && index < documentProfiles.size()) {
         // Move element to front which will be the default
         std::rotate(documentProfiles.begin(), documentProfiles.begin() + index, documentProfiles.end());
 
-    }
-    // Update NetworkProfiles
-    // Whatever networkProfile has a DocumentProfileIndex of index, should have DocumentProfileIndex = 0, this is indexSwitchDown
-    // Whatever networkProfile has a DocumentProfileIndex of 0, needs to have a DocumentProfileIndex of index, this is indexSwitchUp
-    // The indexes should not be swapped before the for loop is completed, otherwise double switching will occur
-    int indexSwitchUp {0}, indexSwitchDown {0};
-    for (int i=0; i<networkProfiles.size(); i++) {
-        if (networkProfiles[i]->documentProfileIndex == index) {
-            indexSwitchDown = i;
+        // Update NetworkProfiles
+        // Whatever networkProfile has a DocumentProfileIndex of index, should have DocumentProfileIndex = 0, this is indexSwitchDown
+        // Whatever networkProfile has a DocumentProfileIndex of 0, needs to have a DocumentProfileIndex of index, this is indexSwitchUp
+        // The indexes should not be swapped before the for loop is completed, otherwise double switching will occur
+        int indexSwitchUp {0}, indexSwitchDown {0};
+        for (int i=0; i<networkProfiles.size(); i++) {
+            if (networkProfiles[i]->documentProfileIndex == index) {
+                indexSwitchDown = i;
+            }
+            if (networkProfiles[i]->documentProfileIndex == 0) {
+                indexSwitchUp = i;
+            }
         }
-        if (networkProfiles[i]->documentProfileIndex == 0) {
-            indexSwitchUp = i;
-        }
-    }
-    networkProfiles[indexSwitchUp]->documentProfileIndex = index;
-    // Change the documentProfileNames along using a tempString
-    std::string tempString = networkProfiles[indexSwitchUp]->documentProfileName;
-    networkProfiles[indexSwitchUp]->documentProfileName = networkProfiles[indexSwitchDown]->documentProfileName;
-    networkProfiles[indexSwitchDown]->documentProfileIndex = 0;
-    networkProfiles[indexSwitchDown]->documentProfileName = tempString;
-    
-
+        networkProfiles[indexSwitchUp]->documentProfileIndex = index;
+        // Change the documentProfileNames along using a tempString
+        std::string tempString = networkProfiles[indexSwitchUp]->documentProfileName;
+        networkProfiles[indexSwitchUp]->documentProfileName = networkProfiles[indexSwitchDown]->documentProfileName;
+        networkProfiles[indexSwitchDown]->documentProfileIndex = 0;
+        networkProfiles[indexSwitchDown]->documentProfileName = tempString;
+    }    
 }
 
 /*********************** Paths **************************/
+
+/**
+ * Sets the SSH key path to the specified directory.
+ *
+ * @param dir The directory path for the SSH key.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void Settings::SSHKeyPath(const QString &dir) {
     m_sshKeyPath = dir;
 }
 
+/**
+ * Sets the destination directory to the specified directory.
+ *
+ * @param dir The directory path for the destination.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void Settings::DestinationDir(const QString &dir) {
     m_destinationDir = dir;
 }   
@@ -243,6 +337,13 @@ SettingsUI::SettingsUI (QWidget *parent) : QWidget(parent) {
 
 /********************************* Network Profiles **********************************/
 
+/**
+ * Creates the network tab in the settings UI.
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void SettingsUI::createNetworkTab() {
     qtwSettings.setTabText(0, tr("Network profiles"));
 
@@ -258,6 +359,7 @@ void SettingsUI::createNetworkTab() {
     layoutNetworkForm.addRow(tr("Username: "), &leUsername);
     lePassword.setEchoMode(QLineEdit::PasswordEchoOnEdit);
     layoutNetworkForm.addRow(tr("Password: "), &lePassword);
+    layoutNetworkForm.addRow(tr("Loop through subdirectories: "), &cbRecursive);
 
     // Create DocumentProfile entries
     for (int i=0; i < settings.documentProfileCount(); i++) {
@@ -310,12 +412,20 @@ void SettingsUI::createNetworkTab() {
     QObject::connect(&leDirectory, &QLineEdit::editingFinished, this, &SettingsUI::updateVector);
     QObject::connect(&leUsername, &QLineEdit::editingFinished, this, &SettingsUI::updateVector);
     QObject::connect(&lePassword, &QLineEdit::editingFinished, this, &SettingsUI::updateVector);    
+    QObject::connect(&cbRecursive, &QCheckBox::stateChanged, this, &SettingsUI::updateVector);
     QObject::connect(&cbDocumentProfileName, &QComboBox::currentTextChanged, this, &SettingsUI::updateVector);
 
     // Load all network profiles
     loadNetworkProfiles();
 }
 
+/**
+ * Updates the form to reflect the current network profile when a different profile is selected or the selected profile is unselected or deleted.
+ *
+ * @param currentRow the index of the currently selected network profile in the list widget
+ *
+ * @throws None
+ */
 void SettingsUI::changedNetworkProfile(int currentRow) {
     // Called if the clicks on a different network profile or the selected profile is unselected / deleted
     
@@ -342,9 +452,17 @@ void SettingsUI::changedNetworkProfile(int currentRow) {
     leDirectory.setText(QString::fromStdString(settings.NetworkProfile(currentRow)->url.Directory()));
     leUsername.setText(QString::fromStdString(settings.NetworkProfile(currentRow)->url.Username()));
     lePassword.setText(QString::fromStdString(settings.NetworkProfile(currentRow)->url.Password()));
+    cbRecursive.setChecked(settings.NetworkProfile(currentRow)->isRecursive);
     cbDocumentProfileName.setCurrentIndex(settings.NetworkProfile(currentRow)->documentProfileIndex);
 }
 
+/**
+ * Edits the name of a network profile by making it editable and starting the edit process.
+ *
+ * @param item A pointer to the QListWidgetItem representing the network profile to edit.
+ *
+ * @throws None.
+ */
 void SettingsUI::editNetworkProfile(QListWidgetItem *item) {
     // User has double clicked on a network profile to edit the name
     item->setFlags(item->flags() | Qt::ItemIsEditable);
@@ -352,12 +470,26 @@ void SettingsUI::editNetworkProfile(QListWidgetItem *item) {
     lwNetworkProfiles.editItem(item);
 }
 
+/**
+ * Updates the name of a network profile in the settings vector based on the changes made by the user.
+ *
+ * @param item A pointer to the QListWidgetItem representing the network profile whose name is being updated.
+ *
+ * @throws None.
+ */
 void SettingsUI::updateNetworkProfileName(QListWidgetItem* item) {
     // The user has finished changing the network profile name, update the settings vector
     const int index {lwNetworkProfiles.row(item)};
     settings.NetworkProfile(index)->name = item->text().toStdString();
 }
 
+/**
+ * Adds a new network profile by creating a new QListWidgetItem, making it editable, 
+ * enabling the remove and set default buttons, creating a new networkProfile vector element 
+ * with default entries, and making it the default if it is the first profile.
+ *
+ * @throws None.
+ */
 void SettingsUI::addNetworkProfile() {
     // The user has clicked on the add button to create a new network profile
 
@@ -379,6 +511,7 @@ void SettingsUI::addNetworkProfile() {
     Settings::networkProfile newProfile{
         "defaultname",
         false,
+        false,
         defaultDocumentProfileName,
         0,
         ParseUrl{"sftp://Hostname:22/Directory/"}};
@@ -387,9 +520,15 @@ void SettingsUI::addNetworkProfile() {
     // If it is the first profile, make it default
     if (settings.networkProfileCount() == 1) {
         lwNetworkProfiles.item(0)->setFont(QFont("", -1, QFont::Bold));
+        settings.NetworkProfile(0)->isDefault = true;
     }
 }
 
+/**
+ * Removes the selected network profile from the list of network profiles.
+ *
+ * @throws None
+ */
 void SettingsUI::removeNetworkProfile() {
     // The user has clicked on the remove button
     // QListWidget throws an exception if an item is removed before another item.
@@ -402,8 +541,12 @@ void SettingsUI::removeNetworkProfile() {
     loadNetworkProfiles();
 }
 
+/**
+ * User has clicked on set default button
+ *
+ * @throws None
+ */
 void SettingsUI::setDefaultNetworkProfile() {
-    //User has clicked on set default button
 
     if (lwNetworkProfiles.currentItem() != nullptr) {
         // New default element
@@ -423,6 +566,13 @@ void SettingsUI::setDefaultNetworkProfile() {
     }
 }
 
+/**
+ * Updates the document profiles based on the given index.
+ *
+ * @param index The index of the tab that was clicked.
+ *
+ * @throws None
+ */
 void SettingsUI::updateDocumentProfiles(int index) {
     enum tabIndex
     {
@@ -437,15 +587,28 @@ void SettingsUI::updateDocumentProfiles(int index) {
             cbDocumentProfileName.addItem(QString::fromStdString(settings.DocumentProfile(i)->name));
         }
         cbDocumentProfileName.setCurrentIndex(settings.NetworkProfile(lwNetworkProfiles.currentRow())->documentProfileIndex);   
+        if (lwNetworkProfiles.currentRow() == -1) {
+            lwNetworkProfiles.setCurrentRow(0);
+        }
+    } 
+    else if (index == tabIndex::documentTab && lwDocumentProfiles.currentRow() == -1) {
+        lwDocumentProfiles.setCurrentRow(0);
     }
 }
 
+/**
+ * Updates the internal variable corresponding to the sender object which has changed
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void SettingsUI::updateVector() {
     QObject *senderObject = QObject::sender();
     int profileIndexNetwork {lwNetworkProfiles.currentRow()};
     int profileIndexDocument {lwDocumentProfiles.currentRow()};
 
-    if(profileIndexNetwork >= 0 && profileIndexNetwork < settings.networkProfileCount()) {
+    if(profileIndexNetwork < settings.networkProfileCount()) {
         if (senderObject == &leHost) {
             settings.NetworkProfile(profileIndexNetwork)->url.Host(leHost.text().toStdString());
         }
@@ -461,12 +624,15 @@ void SettingsUI::updateVector() {
         else if (senderObject == &lePassword) {
             settings.NetworkProfile(profileIndexNetwork)->url.Password(lePassword.text().toStdString());
         }
+        else if (senderObject == &cbRecursive) {
+            settings.NetworkProfile(profileIndexNetwork)->isRecursive = cbRecursive.isChecked();
+        }
         else if (senderObject == &cbDocumentProfileName) {
             settings.NetworkProfile(profileIndexNetwork)->documentProfileName = cbDocumentProfileName.currentText().toStdString();
             settings.NetworkProfile(profileIndexNetwork)->documentProfileIndex = cbDocumentProfileName.currentIndex();
         }
     }
-    if (profileIndexDocument >= 0 && profileIndexDocument < settings.documentProfileCount()) {
+    if (profileIndexDocument < settings.documentProfileCount()) {
         if (senderObject == &cbLanguage) {
             settings.DocumentProfile(profileIndexDocument)->language = static_cast<Settings::Language>(cbLanguage.currentIndex());
         }
@@ -481,8 +647,20 @@ void SettingsUI::updateVector() {
             settings.DocumentProfile(profileIndexDocument)->isColored = cbIsColored.isChecked();
         }
     }
+    if (senderObject == &leDestinationDir) {
+        settings.DestinationDir(leDestinationDir.text());
+    } else if (senderObject == &leSSHDir) {
+        settings.SSHKeyPath(leSSHDir.text());
+    }
 }
 
+/**
+ * Loads network profiles and sets specific UI elements based on the settings.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void SettingsUI::loadNetworkProfiles() {
     for (int i=0; i < settings.networkProfileCount(); i++) {
         lwNetworkProfiles.addItem(QString::fromStdString(settings.NetworkProfile(i)->name));
@@ -495,12 +673,20 @@ void SettingsUI::loadNetworkProfiles() {
             leDirectory.setText(QString::fromStdString(settings.NetworkProfile(i)->url.Directory()));
             leUsername.setText(QString::fromStdString(settings.NetworkProfile(i)->url.Username()));
             lePassword.setText(QString::fromStdString(settings.NetworkProfile(i)->url.Password()));
+            cbRecursive.setChecked(settings.NetworkProfile(i)->isRecursive);
             loadDocumentProfile();
             cbDocumentProfileName.setCurrentIndex(settings.NetworkProfile(i)->documentProfileIndex);
         }
     }
 }
 
+/**
+ * Validates the network profiles to ensure they have correct entries and formats.
+ *
+ * @return true if all network profiles are valid, false otherwise
+ *
+ * @throws None
+ */
 bool SettingsUI::validateNetworkProfile() {
     for (int i=0; i < settings.networkProfileCount(); i++) {
         if (settings.NetworkProfile(i)->name == "default" || settings.NetworkProfile(i)->name == "") {
@@ -533,6 +719,10 @@ bool SettingsUI::validateNetworkProfile() {
 }
 
 /******************************************Document Profiles*********************************/
+
+/**
+ * Creates the document tab in the settings UI.
+ */
 void SettingsUI::createDocumentTab() {
     qDocumentWidget.setLayout(&layoutDocumentV);
     layoutDocumentV.addLayout(&layoutDocumentH);
@@ -600,6 +790,13 @@ void SettingsUI::createDocumentTab() {
     loadDocumentProfile();
 }
 
+/**
+ * Updates the form to reflect the current document profile when a different profile is selected or the selected profile is unselected or deleted.
+ *
+ * @param index the index of the currently selected document profile in the list widget
+ *
+ * @throws None
+ */
 void SettingsUI::changedDocumentProfile(int index) {
     // If the user clicks on a different document profile or the selected profile is unselected / deleted
 
@@ -627,6 +824,15 @@ void SettingsUI::changedDocumentProfile(int index) {
     cbIsColored.setChecked(settings.DocumentProfile(index)->isColored);
 }
 
+/**
+ * Edits the name of a document profile when the user double-clicks on it.
+ *
+ * @param item The QListWidgetItem representing the document profile to be edited.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void SettingsUI::editDocumentProfile(QListWidgetItem *item) {
     // The user has double clicked on a document profile to edit its name
     item->setFlags(item->flags() | Qt::ItemIsEditable);
@@ -634,12 +840,26 @@ void SettingsUI::editDocumentProfile(QListWidgetItem *item) {
     lwDocumentProfiles.editItem(item);
 }
 
+/**
+ * Updates the name of a document profile when the user has finished changing it.
+ *
+ * @param item The QListWidgetItem representing the document profile to be updated.
+ *
+ * @throws None
+ */
 void SettingsUI::updateDocumentProfileName(QListWidgetItem* item) {
     // The user has finished changing the document profile name, update the settings vector
     const int index {lwDocumentProfiles.row(item)};
     settings.DocumentProfile(index)->name = item->text().toStdString();  
 }
 
+/**
+ * Adds a new document profile to the settings UI.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void SettingsUI::addDocumentProfile() {
     // The user has clicked on the add button to create a new document profile
 
@@ -666,6 +886,11 @@ void SettingsUI::addDocumentProfile() {
     }
 }
 
+/**
+ * Removes the currently selected document profile from the settings UI and updates the UI accordingly.
+ *
+ * @throws None
+ */
 void SettingsUI::removeDocumentProfile() {
     // The user has clicked on the remove button
     int indexElement = lwDocumentProfiles.currentRow();
@@ -674,6 +899,11 @@ void SettingsUI::removeDocumentProfile() {
     loadDocumentProfile();
 }
 
+/**
+ * Sets the default document profile based on the currently selected item in the list widget.
+ *
+ * @throws None
+ */
 void SettingsUI::setDefaultDocumentProfile() {
     // The user has clicked on the set default button
     int indexElement = lwDocumentProfiles.currentRow();
@@ -683,6 +913,15 @@ void SettingsUI::setDefaultDocumentProfile() {
     loadDocumentProfile();
 }
 
+/**
+ * Loads the document profiles into the UI elements based on the settings data.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void SettingsUI::loadDocumentProfile() {
     lwDocumentProfiles.clear();
     for (int i = 0; i < settings.documentProfileCount(); i++) {
@@ -697,6 +936,14 @@ void SettingsUI::loadDocumentProfile() {
     }
 }
 
+/**
+ * Sets the new step value for the resolution slider
+ * Only values of 150, 300, 600, 1200 are allowed
+ *
+ * @param newValue the new value for the resolution slider
+ *
+ * @throws None
+ */
 void SettingsUI::setStepValue(int newValue) {
     // value should only take 150 - 300 - 600 - 1200
     static int previousValue = newValue;
@@ -742,6 +989,15 @@ void SettingsUI::setStepValue(int newValue) {
         isRecursion = false;
     }
 }
+/**
+ * Validates the document profiles to check for empty names and prompts the user for deletion if necessary.
+ *
+ * @param None
+ *
+ * @return true if the validation is successful, false otherwise
+ *
+ * @throws None
+ */
 bool SettingsUI::validateDocumentProfile() {
     for (int i = 0; i < settings.documentProfileCount(); i++) {
         // Check if the profile name is empty, if so it should be deleted
@@ -768,23 +1024,46 @@ bool SettingsUI::validateDocumentProfile() {
     return true;
 }
 
+/**
+ * Creates the Path tab in the Settings UI, setting up the layout and connecting necessary signals.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void SettingsUI::createPathTab() {
     qPathWidget.setLayout(&layoutPath);
     layoutPath.addWidget(&lblDestinationDir, 0, 0);
     layoutPath.addWidget(&leDestinationDir, 0, 1);
+    leDestinationDir.setText(settings.DestinationDir());
     btDestinationDir.setText("...");
     layoutPath.addWidget(&btDestinationDir, 0, 2);
 
     layoutPath.addWidget(&lblSSHDir, 1, 0);
     layoutPath.addWidget(&leSSHDir, 1, 1);
+    leSSHDir.setText(settings.SSHKeyPath());
     btSSHDir.setText("...");
     layoutPath.addWidget(&btSSHDir, 1, 2);
 
     qtwSettings.addTab(&qPathWidget, tr("Path settings"));
     QObject::connect(&btDestinationDir, &QPushButton::pressed, this, &SettingsUI::getPaths);
     QObject::connect(&btSSHDir, &QPushButton::pressed, this, &SettingsUI::getPaths);
+
+    QObject::connect(&leDestinationDir, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
+    QObject::connect(&leSSHDir, &QLineEdit::textChanged, this, &SettingsUI::updateVector);
 }
 
+/**
+ * Retrieves the selected directory from the file dialog and updates the corresponding line edit and settings.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void SettingsUI::getPaths() {
     QObject *senderObject = QObject::sender();
     QFileDialog fileDialog(this);
@@ -805,11 +1084,25 @@ void SettingsUI::getPaths() {
     }
 }
 
+/**
+ * Sets the text of the destination directory and SSH key path line edits based on the current settings.
+ *
+ * @throws None
+ */
 void SettingsUI::setPaths() {
     leDestinationDir.setText(settings.DestinationDir());
     leSSHDir.setText(settings.SSHKeyPath());
 }
 
+/**
+ * Validates a given path by checking if it exists. If the path is empty, it returns true.
+ * If the path does not exist, it prompts the user to create the directory.
+ *
+ * @param Path The path to be validated.
+ * @return True if the path is empty or if it exists, false otherwise.
+ *
+ * @throws None
+ */
 bool SettingsUI::validatePath(const QString Path) {
     // Empty Path -> no modification, so return true
     if (Path.isEmpty()) {
@@ -835,17 +1128,30 @@ bool SettingsUI::validatePath(const QString Path) {
     return true;
 }
 
+/**
+ * Shows the settings dialog.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void SettingsUI::showDialog() {
     qdSettings.exec();
 }
 
+/**
+ * ClickedOK function checks the user inputs and accepts the settings dialog if all inputs are valid:
+ *   - It could be that the user has clicked on add profile and
+ *     has not entered a profile name, in this case the empty lwNetworkProfile item should be removed
+ *   - The user has not entered  a hostname or directory for a profile name
+ *   - Non existing path names of leDestinationDir and leSSHDir should be excluded
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void SettingsUI::clickedOK() {
-    /* Check user inputs:
-        - It could be that the user has clicked on add profile and
-          has not entered a profile name, in this case the empty lwNetworkProfile item should be removed
-        - The user has not entered  a hostname or directory for a profile name
-        - Non existing path names of leDestinationDir and leSSHDir should be excluded
-    */
+
     if (!validateNetworkProfile()) return;
     if (!validateDocumentProfile()) return;
     if (!validatePath(leDestinationDir.text())) return;
@@ -854,6 +1160,32 @@ void SettingsUI::clickedOK() {
     qdSettings.accept();
 }
 
+/**
+ * Saves the values in the settings object.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void SettingsUI::accepted() {
     settings.saveValues();
 }
+
+/*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
+    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger . de
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>
+*/

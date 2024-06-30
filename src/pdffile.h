@@ -1,40 +1,18 @@
 #ifndef PDFFILE_H
 #define PDFFILE_H
 
-#include <thread>
-#include <filesystem>
-#include <fstream>
-#include <string>
-#include <regex>
-#include <thread>
 
-// ImageMagick
-#include <Magick++.h>
+#include <string>
 
 // Tesseract api
 #include <tesseract/baseapi.h>
 #include <tesseract/renderer.h>
 #include <leptonica/allheaders.h>
 
-// libssh
-#include <libssh/sftp.h>
-
-// poppler
-#include <poppler/cpp/poppler-document.h>
-#include <poppler/cpp/poppler-page.h>
-#include <poppler/cpp/poppler-image.h>
-
 //Qt 6.x
 #include <QObject>
-#include <QCoreApplication>
-#include <QMetaMethod>
-#include <QMessageBox>
-#include <QMainWindow>
 #include <QIODevice>
-#include <QSaveFile>
 #include <QBuffer>
-
-// TessPDFRenderer
 
 // local
 #include "parseurl.h"
@@ -42,73 +20,83 @@
 #include "settings.h"
 #include "scan2ocr.h"
 
-// Version 0.0.3 
 class PdfFile : public QObject {
     Q_OBJECT
 
 public:
-    PdfFile(ParseUrl Url, QObject *parent = nullptr);
-
+    PdfFile(ParseUrl Url, QObject *parent = nullptr, int documentProfileIndex = 0);
     void initialize();
-    bool removeEmptyPages();
-    bool transcodeFile();
-    bool ocrFile();
-
-    //bool renameFile(const std::string &newName);
+    
+    // file handling
     bool removeFile();
-    bool saveToFile (const std::string fileName);
+    bool renameToFileName (const std::string fileName);
     std::string FileName() { return m_possibleFileName; };
     std::shared_ptr<QIODevice> returnFileContent();
+    const char *pdfFileName() { return tempFileName.c_str(); };
 
     const int getStatusIncrement () { 
-        const int c_statusIncrement = 5;
-        return  c_statusIncrement;
+        return  maxStatusIncrement;
     };
 
 signals:
     // New status value
     void statusChange();
+    // All processing done
     void finished();
 
 private:
+    // How many times statusChange is emitted for one image page
+    static constexpr int cStatusIncrement = 4;
+
+    // How many times statusChange will be called in total from this class
+    int maxStatusIncrement {0};
+
     ParseUrl m_Url;
     QObject m_parent;
     Settings settings;
     FtpConnection ftpConnection {m_Url};
+    tesseract::TessBaseAPI ocr;
+    std::unique_ptr<tesseract::TessPDFRenderer>renderer;
+    
+    const std::string tempFileName = settings.TmpDir() + m_Url.Filename();
+    const std::string *readFile (std::string *pdfFile);
+    void readData (const std::string *pdfData);
+    void startPDF();
+    void endPDF();
 
-    std::shared_ptr<QBuffer> pdfBuffer = std::make_shared<QBuffer>();
-
-    int m_Status {0};
-    const std::string m_FileName {m_Url.RawFilename()};
-    const std::string tempFileName {settings.TmpDir() + m_Url.Filename()};
-
-    std::vector<Magick::Image> m_PdfImgList;
-    bool readFile (ParseUrl m_Url);
+    void processImage (const std::string *imageStringData, int page);
+    bool isEmptyPage(Pix *pix);
+    void transcode (Pix *&pix);
+    void ocrPage (Pix *pix, int page);
 
     std::string m_possibleFileName {""};
-    std::string getFileName();
+    void getFileName();
+
+    int m_documentProfileIndex;
+    Settings::documentProfile documentProfile;
 };
 
 class Directory : public QObject {
     Q_OBJECT
 
 public:
-    Directory(ParseUrl Url, QObject *parent = nullptr, bool isRecursive = true);
+    Directory(ParseUrl Url, QObject *parent = nullptr, bool isRecursive = true, int documentProfileIndex = 0);
     void initialize();
 
 signals:
-    void foundNewFile(std::shared_ptr<ParseUrl> ptr_Url);
+    void foundNewFile(std::shared_ptr<ParseUrl> ptr_Url, int documentProfileIndex);
 
 private:
     ParseUrl m_Url;
     QObject *p_cfMain {nullptr};
     bool m_isRecursive {false};
+    int m_documentProfileIndex;
 };
 
 #endif
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger . de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

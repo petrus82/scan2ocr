@@ -1,5 +1,24 @@
 #include "pdffile.h"
-PdfFile::PdfFile(ParseUrl Url, QObject *parent) : QObject(parent), m_Url(Url), m_parent(parent) {
+
+// From https://github.com/bshoshany/thread-pool:
+#include "BS_thread_pool.hpp"
+
+#include <filesystem>
+#include <fstream>
+#include <regex>
+
+/**
+ * PdfFile constructor that initializes the object with the given URL, parent QObject, and document profile index.
+ *
+ * @param Url the ParseUrl object representing the URL
+ * @param parent the parent QObject
+ * @param documentProfileIndex the index of the document profile
+ *
+ * @return None
+ *
+ * @throws None
+ */
+PdfFile::PdfFile(ParseUrl Url, QObject *parent, int documentProfileIndex) : QObject(parent), m_Url(Url), m_parent(parent), m_documentProfileIndex(documentProfileIndex) {
     if (parent != nullptr) {
         #ifdef DEBUG
             std::cout << "Connecting PdfFile::statusChange and finished (" << this << ") to parent (" << parent << ")" << std::endl;
@@ -8,291 +27,411 @@ PdfFile::PdfFile(ParseUrl Url, QObject *parent) : QObject(parent), m_Url(Url), m
         QObject::connect(this, SIGNAL(statusChange()), parent, SLOT(statusUpdate()), Qt::DirectConnection);
         QObject::connect(this, SIGNAL(finished()), parent, SLOT(filesProcessed()), Qt::DirectConnection);
     }
-    #ifdef DEBUG
-        else {
-            std::cout << "PdfFile initialized with parent nullptr " << std::endl;
-        }
-    #endif
+
+    // Set documentProfile
+    Settings settings;
+    documentProfile.isColored = settings.DocumentProfile(m_documentProfileIndex)->isColored;
+    documentProfile.thresholdValue = settings.DocumentProfile(m_documentProfileIndex)->thresholdValue;
+    documentProfile.resolution = settings.DocumentProfile(m_documentProfileIndex)->resolution;
+    documentProfile.language = settings.DocumentProfile(m_documentProfileIndex)->language;
 }
 
-void PdfFile::initialize(){
-    #ifdef DEBUG
-        std::cout << "PdfFile::initialize on: " << m_Url.Url() << std::endl;
-    #endif 
-    
-    m_Status++;
-    emit statusChange();
-    bool retVal = readFile(m_Url);
-    
-    m_Status++;
-    emit statusChange();
-    retVal =removeEmptyPages();
-    
-    m_Status++;
-    emit statusChange();
-    retVal = transcodeFile();
-    
-    m_Status++;
-    emit statusChange();
-    retVal = ocrFile();
-
-    m_Status++;
-    emit statusChange();
-    m_possibleFileName = getFileName();
-
-    emit finished();
-    #ifdef DEBUG
-        std::cout << "PdfFile::finished from " << this << std::endl;
-    #endif
-}
-
-bool PdfFile::readFile(ParseUrl Url) {
-    // Read local PdfFile into Memory
-    Magick::ReadOptions options;
-    int resolution {settings.resolution()};
-    options.density(Magick::Geometry(resolution, resolution));
-    
-    if (Url.Scheme() == "file") {
-        Magick::readImages(&m_PdfImgList, m_Url.Directory() + "/" + m_Url.Filename(), options);
+/**
+ * Initializes the PdfFile object by reading data from a local pdf file or from a remote server.
+ * Has to be called after the constructor to have a valid object while emitting signals.
+ * @throws None
+ */
+void PdfFile::initialize() {
+    if (m_Url.Scheme() == "file") {
+        std::string filename = m_Url.Directory() + "/" + m_Url.Filename();
+        readData(readFile(&filename));
     }
     else {
-        std::unique_ptr<Magick::Blob> remoteFilePtr = ftpConnection.getFile();
+        std::unique_ptr<std::string> remoteFilePtr = ftpConnection.getFilePtr();
         if (remoteFilePtr != nullptr) {
-            Magick::readImages(&m_PdfImgList, *remoteFilePtr, options);
+            readData(remoteFilePtr.get());
         }
     }
-    
-    return true;
 }
 
-bool PdfFile::removeEmptyPages() {
-    m_PdfImgList.erase(
-        std::remove_if(
-            m_PdfImgList.begin(),
-            m_PdfImgList.end(),
-            [this](Magick::Image& image) {
-                Magick::ImageStatistics statistics = image.statistics();
-                double mean_val = statistics.channel(MagickCore::PixelChannel()).mean() / (1 << 16);
-                return mean_val > settings.thresholdValue();
-            }
-        ),
-        m_PdfImgList.end()
-    );
-    return true;
-}
+/**
+ * Reads the content of a file into a string.
+ *
+ * @param filename The name of the file to read.
+ *
+ * @return A pointer to the string containing the file data.
+ *
+ * @throws None
+ */
+const std::string *PdfFile::readFile(std::string *filename) {
 
-bool PdfFile::transcodeFile() {
-    const bool isColored {settings.isColored()};
-    for (auto &image : m_PdfImgList)
-    {
-        // Turn into black and white image if isColored == false
-        if (!isColored) {
-            image.autoThreshold(MagickCore::AutoThresholdMethod::OTSUThresholdMethod);
-            image.threshold(settings.thresholdValue());
-
-            // Change encoding to Tiff G4
-            image.magick("TIFF");
-            image.depth(8);
-            image.compressType(Magick::CompressionType::Group4Compression);
-        }
-        else {
-            // If isColored == true
-            image.depth(8);
-            image.compressType(Magick::CompressionType::JPEGCompression);
-        }
-        
-    }
-    return true;
-}
-
-bool PdfFile::ocrFile() {
-    #ifdef DEBUG
-        std::cout << "PdfFile::ocrFile() on: " << m_Url.Url() << std::endl;
-    #endif
-
-    tesseract::TessBaseAPI ocr;
-    ocr.Init(NULL, settings.language().c_str(), tesseract::OEM_LSTM_ONLY);
-
-    // Set page segmentation mode (default option is best): ocr.SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_BLOCK);
-    constexpr bool textOnly {false};
-    const std::string outputBase {"/tmp/" + m_Url.RawFilename()};
+    std::ifstream file(*filename, std::ios::in | std::ios::binary);
+    const static std::string pdfData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     
-    tesseract::TessPDFRenderer *renderer = new tesseract::TessPDFRenderer(outputBase.c_str(), ocr.GetDatapath(), textOnly);
-    //PdfStream *pdfStreamRenderer = new PdfStream(outputBase.c_str(), ocr.GetDatapath(), textOnly);
-
-    const std::string inputFileName {"/tmp/" + m_Url.RawFilename()+ ".tiff"};
-    constexpr char *retryConfig {nullptr};
-    constexpr int timeout_millisec {0};
-    constexpr bool adjoin {true};
-
-    // Quite nasty hack with tempfiles because tessPDFRenderer does not take any memory objects or writes a pdf stream to memory
-    // Magick::writeImages(m_PdfImgList.begin(), m_PdfImgList.end(), inputFileName, adjoin);
-    // bool retVal = ocr.ProcessPages (inputFileName.c_str(), retryConfig, timeout_millisec, renderer);
-    
-    // Make ocr on pix object from TIFF 
-    Pix *pix {nullptr};
-    Magick::Blob rawData;
-    Magick::writeImages(m_PdfImgList.begin(), m_PdfImgList.end(), &rawData, adjoin);
-
-    const l_uint8 *imgData = reinterpret_cast<const l_uint8*>(rawData.data());
-    size_t size = rawData.length();
-    size_t offset = 0;
-    int page {0};
-    
-    renderer->BeginDocument(m_FileName.c_str());
-    
-    // only works for tiff files, implement sth. for jpeg if isColored == true
-    if (settings.isColored()) {
-        for (;; ++page) {
-            pix = pixReadMemFromMultipageTiff(imgData, size, &offset);
-            if (pix == nullptr) {
-                break;
-            }
-            if (offset || page > 0) {
-            // Only print page number for multipage TIFF file.
-            std::cout << "Page %d\n" << page + 1 << std::endl;
-            }
-            auto page_string = std::to_string(page);
-            
-            ocr.SetImage(pix);
-            pixDestroy(&pix);
-            bool failed {false};
-            if (!std::unique_ptr<const tesseract::PageIterator>(ocr.AnalyseLayout())) {;
-                failed = true;
-            }
-            failed = ocr.Recognize(nullptr) < 0;
-
-            if (renderer && !failed) {
-                failed = !renderer->AddImage(&ocr);
-            }
-            if (failed) {
-                QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error writing pdf stream")) + QString::fromStdString(tempFileName));
-                return false;
-            }
-
-            if (!offset) {
-            break;
-            }
-        }
-    }
-    else {
-        pix = pixReadMem(imgData, size);
-        ocr.SetImage(pix);
-        pixDestroy(&pix);
-
-        bool failed {false};
-        if (!std::unique_ptr<const tesseract::PageIterator>(ocr.AnalyseLayout())) {;
-            failed = true;
-        }
-        failed = ocr.Recognize(nullptr) < 0;
-
-        if (renderer && !failed) {
-            failed = !renderer->AddImage(&ocr);
-        }
-        if (failed) {
-            QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error writing pdf stream")) + QString::fromStdString(tempFileName));
-            return false;
-        }
-    }
-    renderer->EndDocument();
-
-    //read tempfile into buffer
-    pdfBuffer->open(QIODevice::ReadWrite);
-    QFile file(tempFileName.c_str());
-    if(!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "Failed to open temporary pdf file for reading: " << tempFileName.c_str();
-        return false;
-    }
-    QByteArray data = file.readAll();
-    pdfBuffer->write(data);
-
-    // Now cleanup the mess we left on /tmp
     file.close();
-    pdfBuffer->close();
-    std::remove(tempFileName.c_str());
- 
-    ocr.End();
-    pixDestroy(&pix);
-    delete renderer;
-    return true;
+    return &pdfData;
 }
 
-std::string PdfFile::getFileName() {
-    #ifdef DEBUG
-        std::cout << "PdfFile::getFileName() on: " << m_Url.Url() << std::endl;
-    #endif
-    pdfBuffer->open(QIODevice::ReadOnly);
-    std::unique_ptr<poppler::document> pdfDoc(poppler::document::load_from_raw_data (pdfBuffer->data(), pdfBuffer->size()));
-    pdfBuffer->close(); 
-    if (!pdfDoc) {
-        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error reading file content")));
-        return nullptr;
+/**
+ * Reads the content of a PDF file and extracts image streams.
+ *
+ * @param pdfData A pointer to a string containing the PDF file data.
+ *
+ * @throws None
+*/
+void PdfFile::readData(const std::string *pdfData) {
+
+    // Check if it is a pdf file
+    const std::string pdfHeader {"%PDF-1."};
+
+    if (pdfData->find(pdfHeader) == std::string::npos) {
+        std::cout << "This is not a pdf file!" << std::endl;
+        return;
     }
 
-    // Get the first page of the PDF
-    std::unique_ptr<poppler::page> firstPage(pdfDoc->create_page(0));
-    if (!firstPage) {
-        QMessageBox::critical(nullptr, tr("Error"), QString(tr("Error reading first page")));
-        return nullptr;
+    // Extract all dictionary objects
+    const std::regex patternDict("<<([^>]+)>>");
+    std::vector<size_t> dictObjectPositions;
+
+    std::sregex_iterator next(pdfData->begin(), pdfData->end(), patternDict);
+    std::sregex_iterator end;
+
+    while (next != end) {
+        dictObjectPositions.push_back(next->position());
+        next++;
     }
+
+    // Extract jpg image stream positions
+    constexpr int newLineCharacters = 2;
+    constexpr int startCharacters = 10;
+    const std::regex patternImageStream("/Filter\\s/DCTDecode");
+    std::vector<size_t> imageStreamPositions;
+
+    next = std::sregex_iterator(pdfData->begin(), pdfData->end(), patternImageStream);
+    end = std::sregex_iterator();
+
+    while (next != end) {
+        imageStreamPositions.push_back(next->position());
+        next++;
+    }
+
+    startPDF();
+
+    // Extract every image stream
+    const int pages = imageStreamPositions.size();
+    maxStatusIncrement = pages * cStatusIncrement;
+
+    BS::thread_pool threadPool;
+    #define MULTITHREAD
+
+    for (int i = 0; i < pages; i++) {
+    #ifdef MULTITHREAD
+        threadPool.detach_task(
+            [&]
+            { 
+    #endif
+                const size_t startPos = imageStreamPositions[i];
+                constexpr size_t newLineCharacters = 2;
+                const size_t endPos = pdfData->find("endstream", startPos);
+
+                std::string *jpgImage = new std::string(pdfData->substr(startPos, endPos - startPos - newLineCharacters));
+
+                // Remove the pdf image declarations
+                const std::regex patternStart(">>(\r\n)stream");
+                std::smatch match;
+                std::regex_search(*jpgImage, match, patternStart);
+
+                if (match.size() > 1) {
+                    *jpgImage = jpgImage->substr(match.position(1) + startCharacters);    
+                    processImage(jpgImage, i);
+                }
+                delete jpgImage;
+                jpgImage = nullptr;
+            
+    #ifdef MULTITHREAD
+            }
+        );
+        threadPool.wait(); 
+    #endif
+    }
+
+    endPDF();
+    emit finished();
+}
+
+/**
+ * Initializes the PDF file for OCR processing.
+ *
+ * This function sets up the OCR engine with the appropriate language and page segmentation mode.
+ * It also creates a TessPDFRenderer object with the specified output base, Tesseract data path,
+ * and text-only flag. Finally, it begins the document with the specified title.
+ *
+ * @return void
+ *
+ * @throws None
+ */
+void PdfFile::startPDF() {
+    std::string language;
+    switch (documentProfile.language) {
+        case Settings::Language::deu:
+            language = "deu";
+            break;
+        case Settings::Language::eng:
+            language = "eng";
+            break;
+        default:
+            // Handle unknown language
+            break;
+    }
+    ocr.Init(NULL, language.c_str());
+    ocr.SetPageSegMode(tesseract::PageSegMode::PSM_AUTO);
+
+    const std::string outputBaseStr {tempFileName.substr(0, tempFileName.length() - 4)};
+    const char  *outputBase = outputBaseStr.c_str();
+    const char *tesseractDataPath {ocr.GetDatapath()};
+    const bool textonly {false};    
+    renderer = std::make_unique<tesseract::TessPDFRenderer>(outputBase, tesseractDataPath, textonly);
+    
+    const char *documentTitle = m_Url.Filename().c_str();
+    renderer->BeginDocument(documentTitle);
+}
+
+/**
+ * Processes an image (which will be one page of a PDF file) by reading it from a string.
+ *
+ * @param imageStringData A pointer to a string containing the image data.
+ * @param page The page number of the image.
+ *
+ * @throws None
+ */
+void PdfFile::processImage (const std::string *imageStringData, int page) {
+    
+    // First create l_uint8 from std::string
+    const l_uint8 *l_uint8Ptr = (const unsigned char *) imageStringData->c_str();
+    size_t length {imageStringData->size()};
+    Pix *pix {pixReadMem(l_uint8Ptr, length)};
+
+    if (!isEmptyPage(pix)) {
+        transcode(pix);
+        ocrPage(pix, page);
+        if (page == 0) {
+            getFileName();
+        }   
+    }
+
+    pixDestroy(&pix);
+}
+
+/**
+ * Ends the PDF document by calling the EndDocument method of the renderer object and
+ * the End method of the OCR object.
+ *
+ * @throws None
+ */
+void PdfFile::endPDF() {
+    renderer->EndDocument();
+    ocr.End();
+}
+
+/**
+ * Check if the page represented by the Pix object is considered an empty image based on the average pixel value.
+ *
+ * @param pix The Pix object representing the image page to be checked.
+ *
+ * @return True if the image is considered empty 
+ * (i.e., the average pixel value is below the threshold set in the Settings object),
+ *  false otherwise.
+ *
+ * @throws None
+ */
+bool PdfFile::isEmptyPage(Pix *pix) {
+    if (!pix) return false;
+
+    // Check if resolution is higher than documentProfile.resolution
+    int resolution {documentProfile.resolution};
+    int xRes = pixGetXRes(pix);
+    int yRes = pixGetYRes(pix);
+
+    if (xRes > resolution || yRes > resolution) {
+        pix = pixScale(pix, resolution, resolution);
+    }
+
+    /* 
+    pixGetPixelAverage:
+    * \param[in]    pixs     8 or 32 bpp, or colormapped
+    * \param[in]    pixm     [optional] 1 bpp mask over which average is
+    *                        to be taken; use all pixels if null
+    * \param[in]    x, y     UL corner of pixm relative to the UL corner of pixs;
+    *                        can be < 0
+    * \param[in]    factor   subsampling factor; >= 1
+    * \param[out]   pval     average pixel value
+    * */
+    PIX *pixm {NULL};
+    l_int32 x {0}, y {0};
+    l_int32 factor {2};
+    std::shared_ptr<l_uint32>imageAverage = std::make_shared<l_uint32>();
+
+    pixGetPixelAverage(pix, pixm, x, y, factor, imageAverage.get());
+    double mean_val = static_cast<double>(*imageAverage) / static_cast<double>(std::numeric_limits<l_uint32>::max());
+    emit statusChange();
+    return (mean_val > settings.thresholdValue()); 
+}
+
+/**
+ * Transcodes the given Pix object to 1 bpp if settings.isColored is false.
+ * Thus the image will be a TIFF G4 encoded object in the final PDF document.
+ *
+ * @param pix The Pix object to be transcoded.
+ *
+ * @throws None
+ */
+void PdfFile::transcode(Pix *&pix) {
+
+        if (!documentProfile.isColored) {
+            pix = pixCleanImage(pix, 5, 0, 1, 0);
+        }
+        emit statusChange();
+}
+
+/**
+ * Sets the image for OCR processing, recognizes the text, and adds the image to the renderer. 
+ *
+ * @param pix Pointer to the Pix object representing the image.
+ * @param page The page number to be processed.
+ *
+ * @return None
+ *
+ * @throws None
+ */
+void PdfFile::ocrPage(Pix *pix, int page) {
+    ocr.SetImage(pix);
+    bool failed = ocr.Recognize(nullptr) < 0;
+    failed = !renderer->AddImage(&ocr);
+
+    emit statusChange();
+}
+
+/**
+ * Retrieves the file name for the PDF file based on the text content of the file.
+ *
+ * This function iterates through the text elements of the PDF file using the Tesseract OCR engine,
+ * calculates the font size of each text element, and stores the text and font size in a vector.
+ * The text elements are then sorted in descending order based on the font size.
+ * The function searches for a date in the text content and rearranges it to the format "yyyy mm".
+ * It also checks for the presence of an invoice string in the text content.
+ * If no date or file descriptor is found, the current date and time are used as the file name.
+ * If a date is found, it is added to the file descriptor.
+ * If an invoice string is found, it is added to the file name.
+ * The resulting file name is emitted through the `statusChange` signal.
+ *
+ * @return void
+ *
+ * @throws None
+ */
+void PdfFile::getFileName() {
 
     // Check for the largest line of text which does not end with a "." character and has more than 2 characters,
     // which hopefully will be in the majority of cases some descriptive filename
     double font_size {0};
     double largestFontSize {0.0};
     std::string lineWithLargestFontSize {""};
-    for (const auto& text_item : firstPage->text_list(1))   //opt_flag has to be 1 to get the fontsize
-    {
-        font_size = text_item.get_font_size();
-        if (font_size > largestFontSize && text_item.text().length() > 2 && text_item.text().back() != '.'){
-            largestFontSize = font_size;
-            lineWithLargestFontSize = text_item.text().to_latin1().c_str();
-        }
+
+    tesseract::ResultIterator *resultIterator = ocr.GetIterator();
+    // Loop through the iterator and get results at word level, calculate bounding box height and fontsize
+    tesseract::PageIteratorLevel level = tesseract::RIL_TEXTLINE;
+    resultIterator->Begin();
+
+    struct textElement {
+        std::string text;
+        int font_size;
+    };
+    std::vector <textElement> textVector;
+
+    while (!resultIterator->Empty(level)) {
+       // Get Bounding box dimensions
+        int left, top, right, bottom;
+        resultIterator->BoundingBox(level, &left, &top, &right, &bottom);
+        bool is_bold,is_italic, is_underlined, is_monospace, is_serif, is_smallcaps;
+        int pointsize, font_id;
+        std::string text = resultIterator->GetUTF8Text(level);
+        resultIterator->WordFontAttributes(&is_bold, &is_italic, &is_underlined, &is_monospace, &is_serif, &is_smallcaps, &pointsize, &font_id);
+    
+        textVector.emplace_back(textElement{text, pointsize});
+        #ifdef DEBUG
+            std::cout << text << ": " << pointsize << std::endl;
+        #endif
+        resultIterator->Next(level);
     }
-    std::string possibleFileName = lineWithLargestFontSize;
+
+    // Sort text in descending order based on fontsize
+    auto cmp = [](const textElement& a, const textElement& b) { return a.font_size > b.font_size; };
+    std::sort(textVector.begin(), textVector.end(), cmp);
+
+    std::string filedescriptor, datestring, invoicestring;
+    bool isInvoice {false};
+
+    // Get translation for invoice if other language than english
+    const std::string invoiceString = QObject::tr("Invoice").toStdString();
 
     // Check for the first occuring date in the format dd.mm.yyyy
     // which can be the date of the letter or invoice
-    std::string text {firstPage->text().to_latin1().c_str()};
     std::regex pattern("(0[1-9]|[1-2][0-9]|3[0-1])\\.(0[1-9]|1[0-2])\\.(19[0-9]{2}|20[0-9]{2}|2100)");
 
     // Search for a date in the text
     std::smatch match;
-    if (std::regex_search(text, match, pattern)) {
-        // Rearrange the date to the format "yyyy mm"
-        // to have the file names sorted according to year than to month
-        std::string rearrangedDate = match[3].str() + " " + match[2].str() + " ";
-        possibleFileName.insert (0, rearrangedDate);
+
+    for (const auto& text_item : textVector) {
+        // Take the first useful text (which will be the element with the largest fontsize 
+        // and has more than a coule of characters) as a possible file descriptor
+
+        if (filedescriptor.length() == 0 && text_item.text.length() > 3) {
+            // Get the first word
+            filedescriptor = text_item.text.substr(0, text_item.text.find_first_of(" "));
+        }
+
+        if (datestring.length() == 0 && std::regex_search(text_item.text, match, pattern)) {
+            // Rearrange the date to the format "yyyy mm"
+            // to have the file names sorted according to year than to month
+            datestring = match[3].str() + " " + match[2].str() + " ";
+        }
+
+        // Check if the text item contains the invoice string
+        if (text_item.text.find(invoiceString) != std::string::npos) {
+            isInvoice = true;
+        }
     }
-    else if (possibleFileName == ""){
-        // If no date has been found, then use the current date and time
-        possibleFileName = getUniqueFileName();
+
+    if (filedescriptor == "" && datestring == ""){
+        // If no date has been found and no useful file descriptor yet exists, then use the current date and time
+        m_possibleFileName = getUniqueFileName();
     }
-    else {
+    else if (datestring == "") {
+        // Add the current date to the file descriptor if no date has been found
         auto now = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(now);
         std::stringstream ss;
         ss << std::put_time(std::localtime(&in_time_t), "%Y %m ");
-        possibleFileName = ss.str() + possibleFileName;
+        m_possibleFileName = ss.str() + filedescriptor;
+    }
+    else {
+        m_possibleFileName = datestring + " " + filedescriptor;
     }
 
-    // Check if the file is an invoice
-    // first we have to get the current application language
-    const std::string invoiceString {QString(tr("Invoice")).toStdString()};
-
-    if (text.find(invoiceString) != std::string::npos) {
-        possibleFileName += " - " + invoiceString;
+    if (isInvoice) {
+        m_possibleFileName += " - " + invoiceString;
     }
 
-    possibleFileName += ".pdf";
-    
-    #ifdef DEBUG
-        std::cout << "PdfFile::getFileName(), possibleFileName: " << possibleFileName << std::endl;
-    #endif
-
-    return possibleFileName;
+    m_possibleFileName += ".pdf";
+    emit statusChange();
 }
 
+/**
+ * Removes the file associated with the PdfFile object.
+ *
+ * @return true if the file was successfully removed, false otherwise
+ *
+ * @throws None
+ */
 bool PdfFile::removeFile() {
     if (m_Url.Scheme() == "file") {
         #ifdef DEBUG
@@ -315,51 +454,85 @@ bool PdfFile::removeFile() {
             }
         #endif
     }
+    std::remove(tempFileName.c_str());
     return true;
 }
 
-bool PdfFile::saveToFile(const std::string fileName) {
-    #ifdef DEBUG
-        std::cout << "PdfFile::saveToFile on: " << fileName << std::endl;
-    #endif
-    
+/**
+ * Renames the PdfFile to the specified fileName if it does not already exist. Handle potential errors.
+ *
+ * @param fileName The new file name to rename to.
+ *
+ * @return true if the file was successfully renamed, false otherwise.
+ *
+ * @throws std::filesystem::filesystem_error if there are errors during file copying or removal.
+ */
+bool PdfFile::renameToFileName(const std::string fileName) {
+    std::filesystem::copy_options options = std::filesystem::copy_options::none;
     if (std::filesystem::exists(fileName)) {
-        QMessageBox msgBox;
-        msgBox.setText(QString::fromStdString(fileName));
-        msgBox.setInformativeText(tr("File already exists. Overwrite?"));
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgBox.setDefaultButton(QMessageBox::No);
-        int ret = msgBox.exec();
-        if (ret == QMessageBox::No) {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(nullptr, tr("Warning"), QString(tr("File already exists, overwrite?")), QMessageBox::Yes | QMessageBox::No);
+        if (reply == QMessageBox::No) {
             return false;
+        } 
+        else {
+            // It should be overwritten
+            options = std::filesystem::copy_options::overwrite_existing;
         }
+    } 
+
+    // Because the destination file can be on another filesystem we cannot use std::filesystem::rename
+    try {
+        std::filesystem::copy(tempFileName.c_str(), fileName.c_str(), options);    
     }
-    
-    pdfBuffer->open(QIODevice::ReadOnly);
-    QByteArray data = pdfBuffer->readAll();
-    pdfBuffer->close();
-    std::ofstream outputFile(fileName, std::ios::binary);
-    if (!outputFile) {
-        qWarning() << "Failed to open file for writing: " << fileName.c_str();
+    catch (const std::filesystem::filesystem_error& ex) {
+        std::cerr << "Error copying temp file to " << fileName << " because: " << ex.what() << std::endl;
         return false;
     }
-    outputFile.write(data.data(), data.size());
-    outputFile.close();
-    return true;
+    if (!std::filesystem::remove(tempFileName.c_str())) {
+        std::cerr << "Error removing temp file." << std::endl;
+        return false;
+    };
+
+    return std::filesystem::exists(fileName);
 }
 
+/**
+ * Returns the file content as a shared pointer.
+ * @throws None
+ */
 std::shared_ptr<QIODevice> PdfFile::returnFileContent() {
-    #ifdef DEBUG
-        std::cout << "PdfFile::returnFileContent on: " << m_Url.Url() << std::endl;
-    #endif
-    pdfBuffer->open(QIODevice::ReadOnly);
-    return pdfBuffer;
+    std::shared_ptr<QIODevice> pdfBuffer = std::make_shared<QFile>(tempFileName.c_str());
+    if (pdfBuffer->open(QIODevice::ReadWrite)) {
+        QByteArray fileData = pdfBuffer->readAll();
+        pdfBuffer->write(fileData);
+    }
+    return std::move(pdfBuffer);
 }
 
-Directory::Directory (ParseUrl Url, QObject *parent, bool isRecursive) : QObject (parent), m_Url(Url), p_cfMain (parent), m_isRecursive (isRecursive) {
+/**
+ * Constructs a new Directory object with the given ParseUrl, parent QObject,
+ * recursion flag, and document profile index.
+ *
+ * @param Url the ParseUrl object representing the directory URL
+ * @param parent the parent QObject
+ * @param isRecursive a flag indicating whether to recurse through subdirectories
+ * @param documentProfileIndex the index of the document profile
+ *
+ * @throws None
+ */
+Directory::Directory (ParseUrl Url, QObject *parent, bool isRecursive, int documentProfileIndex) : 
+    QObject (parent), m_Url(Url), p_cfMain (parent), m_isRecursive (isRecursive), m_documentProfileIndex(documentProfileIndex) {
 
 }
 
+/**
+ * Initializes the Directory object by scanning a local or remote directory for subdirectories and pdf files.
+ * Creates instances of PdfFile for each .pdf file and Directory for each subdirectory.
+ * Has to be called after the constructor to have a valid object while emitting signals.
+ *
+ * @throws None
+ */
 void Directory::initialize() {
     #ifdef DEBUG 
         std::cout << "Directory(): New Directory: " << m_Url.Url() << " p_cfMain: " << p_cfMain << " m_isRecursive: " << m_isRecursive << std::endl;
@@ -370,7 +543,7 @@ void Directory::initialize() {
             ParseUrl new_Url (m_Url);
             new_Url.FileDir(entry.path().string());
             std::shared_ptr<ParseUrl>ptr_Url = std::make_shared<ParseUrl>(new_Url);
-            emit foundNewFile(ptr_Url);
+            emit foundNewFile(ptr_Url, m_documentProfileIndex);
         }
     };
 
@@ -403,7 +576,7 @@ void Directory::initialize() {
                     std::cout << "Creating new instance of PdfFile with p_cfMain to " << p_cfMain << std::endl;
                     std::cout << "foundNewFile from Directory()" << std::endl;
                 #endif
-                emit foundNewFile(ptr_newUrl);
+                emit foundNewFile(ptr_newUrl, m_documentProfileIndex);
             }    
         }
         

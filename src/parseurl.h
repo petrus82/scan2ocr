@@ -10,31 +10,31 @@ public:
     ParseUrl(const std::string Url);
     ParseUrl();
     
-    std::string Scheme() const;
+    std::string Scheme() const { return scheme; };
     void Scheme(const std::string Scheme);
     
-    std::string Host() const;
+    std::string Host() const { return host; };
     void Host(const std::string Host);
 
-    int Port() const;
+    int Port() const { return port; };
     void Port(const int Port);
 
-    std::string Username() const;
+    std::string Username() const { return username; };
     void Username(const std::string Username);
 
-    std::string Password() const;
+    std::string Password() const { return password; };
     void Password(const std::string Password);
     
-    std::string Directory() const;
+    std::string Directory() const { return directory; };
     void Directory(const std::string Directory);
 
-    std::string Filename() const;
+    std::string Filename() const { return filename; };
     void Filename(const std::string Filename);
 
     std::string FileDir () const;
     void FileDir (const std::string FileDir);
         
-    std::string RawFilename() const;
+    std::string RawFilename() const { return rawFilename; };
     void RawFilename(const std::string RawFilename);
 
     std::string Url();

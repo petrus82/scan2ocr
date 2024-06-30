@@ -1,6 +1,13 @@
 #include "scan2ocr.h"
 #include "parseurl.h"
 
+/**
+ * Constructs a ParseUrl object from a given URL.
+ *
+ * @param Url The URL to parse.
+ *
+ * @throws None.
+ */
 ParseUrl::ParseUrl (const std::string Url) {
     m_url = Url;
     // Url = scheme://[user]:[password]@host[:port]/directory/subdirectory/filename.extension
@@ -68,24 +75,43 @@ ParseUrl::ParseUrl (const std::string Url) {
     rawFilename = filename.substr(0, filename.length() - 4);
 }
 
+/**
+ * Constructor for the ParseUrl class.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 ParseUrl::ParseUrl () {
     m_url = "";
 }
 
-std::string ParseUrl::Scheme() const {
-    return scheme;
-}
-
+/**
+ * Sets the scheme of the URL if the input scheme is longer than 4 characters.
+ *
+ * @param Scheme The scheme to set.
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void ParseUrl::Scheme (const std::string Scheme) {
     if (Scheme.length() > 4){
         scheme = Scheme;    
     }
 }
 
-std::string ParseUrl::Host() const {
-    return host;
-}
-
+/**
+ * Sets the host of the URL if the input host is not empty.
+ *
+ * @param Host The host to set.
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void ParseUrl::Host (const std::string Host) {
     if (Host.length() > 0) {
         #ifdef DEBUG
@@ -95,10 +121,15 @@ void ParseUrl::Host (const std::string Host) {
     }
 }
 
-std::string ParseUrl::Directory () const {
-    return directory;
-}
-
+/**
+ * Sets the directory of the URL if the input directory is not empty.
+ *
+ * @param Directory The directory to set.
+ *
+ * @return None.
+ *
+ * @throws None.
+ */
 void ParseUrl::Directory (const std::string Directory) {
     if (Directory.length() > 3) {
         #ifdef DEBUG
@@ -108,10 +139,15 @@ void ParseUrl::Directory (const std::string Directory) {
     }
 }
 
-std::string ParseUrl::Filename () const {
-    return filename;
-}
-
+/**
+ * Sets the filename of the URL if the input filename has a length greater than 4.
+ *
+ * @param Filename The filename to set.
+ *
+ * @return None.
+ *
+ * @throws None.
+ */
 void ParseUrl::Filename (const std::string Filename) {
     if (Filename.length() > 4) {
         #ifdef DEBUG
@@ -121,10 +157,13 @@ void ParseUrl::Filename (const std::string Filename) {
     }
 }
 
-std::string ParseUrl::RawFilename () const {
-    return rawFilename;
-}
-
+/**
+ * Sets the raw filename of the URL if the input raw filename has a length greater than 4.
+ *
+ * @param RawFilename The raw filename to set.
+ *
+ * @throws None.
+ */
 void ParseUrl::RawFilename (const std::string RawFilename) {
     if (RawFilename.length() > 4) {
         #ifdef DEBUG
@@ -134,6 +173,13 @@ void ParseUrl::RawFilename (const std::string RawFilename) {
     }
 }
 
+/**
+ * Sets the directory and filename of the URL based on the input FileDir.
+ *
+ * @param FileDir The file directory to set.
+ *
+ * @throws None.
+ */
 void ParseUrl::FileDir (const std::string FileDir) {
     int lastSlashPosition = FileDir.rfind('/');
     if (lastSlashPosition != std::string::npos) {
@@ -149,15 +195,25 @@ void ParseUrl::FileDir (const std::string FileDir) {
     }
 }
 
+/**
+ * Retrieves the full file directory by concatenating the directory and filename.
+ *
+ * @return The full file directory.
+ *
+ * @throws None
+ */
 std::string ParseUrl::FileDir () const {
     std::string fileDir = directory + filename;
     return fileDir;
 }
 
-std::string ParseUrl::Password () const {
-    return password;
-}
-
+/**
+ * Sets the password for the ParseUrl object if the input password is not empty.
+ *
+ * @param Password The password to set.
+ *
+ * @throws None
+ */
 void ParseUrl::Password (const std::string Password) {
     if (Password.length() > 0) {
         #ifdef DEBUG
@@ -167,10 +223,14 @@ void ParseUrl::Password (const std::string Password) {
     }
 }
 
-std::string ParseUrl::Username () const {
-    return username;
-}
 
+/**
+ * Sets the username for the ParseUrl object if the input username is not empty.
+ *
+ * @param Username The username to set.
+ *
+ * @throws None
+ */
 void ParseUrl::Username (const std::string Username) {
     if (Username.length() > 0) {
         #ifdef DEBUG
@@ -180,10 +240,14 @@ void ParseUrl::Username (const std::string Username) {
     }
 }
 
-int ParseUrl::Port () const {
-    return port;    
-}
 
+/**
+ * Sets the port for the ParseUrl object.
+ *
+ * @param Port The port number to set.
+ *
+ * @throws None
+ */
 void ParseUrl::Port (const int Port) {
     #ifdef DEBUG
         std::cout << "ParseUrl::Port: Port=" << Port << std::endl;
@@ -191,6 +255,16 @@ void ParseUrl::Port (const int Port) {
     port = Port;
 }
 
+/**
+ * Returns the URL constructed from the directory, filename, scheme, host, port, username, and password.
+ * If the scheme is "file", the URL is prefixed with "file://".
+ * If a port is specified, it is appended to the host.
+ * If a username and password are specified, they are appended to the host with an "@" separator.
+ * If only a username is specified, it is appended to the host with an "@" separator.
+ * The URL is prefixed with "sftp://".
+ *
+ * @return The constructed URL.
+ */
 std::string ParseUrl::Url() {
     m_url = directory + filename;
     if (scheme == "file") {
@@ -218,6 +292,15 @@ std::string ParseUrl::Url() {
     return m_url;
 }
 
+/**
+ * Sets the URL of the ParseUrl object if the input URL has a length greater than 7.
+ *
+ * @param Url The URL to set.
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void ParseUrl::Url (std::string Url) {
     if (Url.length() > 7) {
         #ifdef DEBUG
@@ -227,6 +310,11 @@ void ParseUrl::Url (std::string Url) {
     }
 }
 
+/**
+ * Returns a QUrl object constructed from the URL returned by the `Url()` method.
+ *
+ * @return A QUrl object representing the URL.
+ */
 QUrl ParseUrl::qUrl () {
     QUrl qurl(QString::fromStdString(Url()));
     return  qurl;
@@ -234,7 +322,7 @@ QUrl ParseUrl::qUrl () {
 
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.de
+    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger . de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

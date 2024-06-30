@@ -5,8 +5,8 @@
 #include <QString>
 #include <QObject>
 #include <QSettings>
+#include <QResource>
 #include <QTranslator>
-#include <Magick++.h>
 #include "mainwindow.h"
 
 namespace constants {
@@ -17,6 +17,13 @@ namespace constants {
     }();
 }
 
+/**
+ * Generates a unique file name based on the current date and time along with a random number.
+ *
+ * @return The generated unique file name as a string.
+ *
+ * @throws None
+ */
 std::string getUniqueFileName() {
     // Get current date and time
     auto now = std::chrono::system_clock::now();
@@ -34,15 +41,21 @@ std::string getUniqueFileName() {
 }
 
 int main (int argc,char **argv){
-    Magick::InitializeMagick(*argv);
 
     QApplication app(argc, argv);
     
     // Setup translations
     QTranslator translator;
-    Q_UNUSED(translator.load(":/translations/german.qm"));
-    QCoreApplication::installTranslator(&translator);
     QCoreApplication::setApplicationName("scan2ocr");
+    
+
+    QLocale locale = QLocale::system();
+    if (locale.name() == QString("de_DE")) {
+        Q_UNUSED(translator.load(":/translations/german.qm"));
+        bool retval = QCoreApplication::installTranslator(&translator);
+        if (!retval) std::cerr << "Could not install German translation" << std::endl;
+    }
+    
     #ifdef PROGRAM_VERSION
         QCoreApplication::setApplicationVersion(PROGRAM_VERSION);
     #endif
@@ -55,7 +68,7 @@ int main (int argc,char **argv){
 
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger . de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -69,4 +82,4 @@ int main (int argc,char **argv){
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
-    */
+*/

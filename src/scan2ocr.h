@@ -1,25 +1,6 @@
 #ifndef SCAN2OCR_H
 #define SCAN2OCR_H
 
-/*
-Application flow:
-
-scan2ocr::main  -> cfOpen - > OpenFile | OpenPath | Finished -> PdfFileList::addFiles ->
-                                                       |            / \
-                                                      \ /            |
-                (ftpConnection::getConnection -> (getRemoteDir) -> getFile->disconnect)-> PdfFile::PdfFile
-                -> cfMain
-PdfFile::PdfFile -> removeEmptyPage -> transcodeToTiff -> ocrPdf -> getPossibleFileName 
-
-cfMain::rename -> PdfFileList::removeFile | (ftpConnection::deleteFile)
-
-parseUrl to encode / decode Url
-global::getUniqueFileName for temp file name
-*/
-
-#define RED     "\033[31m"
-#define GREEN   "\033[32m"
-
 #include <filesystem>
 #include <string>
 #include <QStandardPaths>
@@ -31,7 +12,7 @@ std::string getUniqueFileName();
 
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger . de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

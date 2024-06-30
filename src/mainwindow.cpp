@@ -3,6 +3,15 @@
 #include <QStandardPaths>
 #include <QMessageBox>
 
+/**
+ * Constructor for the MainWindow class.
+ *
+ * @param parent the parent widget
+ *
+ * @return None
+ *
+ * @throws None
+ */
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     this->setMinimumSize(800, 600);
     // Try to read window geometry from settings
@@ -22,6 +31,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connectSignals();
 }
 
+/**
+ * Destructor for the MainWindow class.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 MainWindow::~MainWindow() {
     // Save window dimensions
     QSettings qSettings;
@@ -40,21 +58,31 @@ MainWindow::~MainWindow() {
     }
 }
 
+/**
+ * Creates the main menu for the MainWindow class.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ *
+ *    
+ *  Menu structure:
+ *  File    - Open File         : openFile()
+ *          - Open Directory    : openPath()
+ *          - Open FTP Server   - Add Profile   : addProfile()
+ *                              - Profile 1     : openNetwork(1)
+ *                              ....
+ *                              - Profile n     : openNetwork(n)
+ *          - Rename File       : rename()
+ *          - Delete File       : deleteFile()
+ *          - Settings          : settings()
+ *          - Quit              : cancel()
+ *  Help    - About             : About()
+ */
 void MainWindow::createMenu() {
-    /*
-    Menu structure:
-    File    - Open File         : openFile()
-            - Open Directory    : openPath()
-            - Open FTP Server   - Add Profile   : addProfile()
-                                - Profile 1     : openNetwork(1)
-                                ....
-                                - Profile n     : openNetwork(n)
-            - Rename File       : rename()
-            - Delete File       : deleteFile()
-            - Settings          : settings()
-            - Quit              : cancel()
-    Help    - About             : About()
-    */
+
     
     addToolBar(Qt::TopToolBarArea, &toolBar);
 
@@ -80,12 +108,15 @@ void MainWindow::createMenu() {
         createNetworkMenuEntry(settings.NetworkProfile(i));
     }
 
+    toolBar.insertWidget(&renameAction, &cbDocumentProfiles);
+    cbDocumentProfiles.setToolTip(tr("The currently used document profile for processing the pdf files."));
+    createDocumentEntries();
+
     renameAction.setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
     renameAction.setIcon(QIcon(":/images/rename.png"));
     renameAction.setStatusTip(tr("Rename file to filename in destination directory."));
-    QObject::connect(&renameAction, &QAction::triggered, this, &MainWindow::save);
+    QObject::connect(&renameAction, &QAction::triggered, this, &MainWindow::renameToFinalName);
     fileMenu->addAction(&renameAction);
-    toolBar.addAction(&renameAction);
 
     deleteAction.setShortcut(QKeySequence::Delete);
     deleteAction.setIcon(QIcon(":/images/delete.png"));
@@ -115,6 +146,29 @@ void MainWindow::createMenu() {
     QObject::connect(&aboutAction, &QAction::triggered, this, &MainWindow::about);
     fileMenu->addAction(&aboutAction);
 }
+
+/**
+ * Creates and sets up the layout for the other widgets in the main window.
+ * 
+ * The layout is structured as follows:
+ * 
+ * |c1           |c2         |c3                |c4              |
+ * -----------------------------------------------------------------
+ * r0: Menu
+ * -----------------------------------------------------------------
+ * r0:Toolbar
+ * -----------------------------------------------------------------
+ * r1:                         | lbDestinationDir
+ * -----------------------------------------------------------------                            
+ * r2:|leFilename  | pbRename  | leDestinationDir | pbDestinationDir
+ * -----------------------------------------------------------------
+ * r3:|        lsFiles         |               pdfView              |
+ * ------------------------------------------------------------------
+ * r4: pbProgress
+ * ------------------------------------------------------------------
+ *
+ * @throws None
+ */
 void MainWindow::createOtherWidgets() {
     centralWidget.setLayout(&mainLayout);
     setCentralWidget(&centralWidget);
@@ -126,25 +180,7 @@ void MainWindow::createOtherWidgets() {
     pbRename.setDefault(true);
 
     pbDestinationDir.setFixedWidth(25);
-    
-    // Create Layout
-    // add widgets to layout (row, col, rowspan, colspan)
-    /*
-      |c1           |c2         |c3                |c4              |
-    -----------------------------------------------------------------
-    r0: Menu
-    -----------------------------------------------------------------
-    r0:Toolbar
-    -----------------------------------------------------------------
-    r1:                         | lbDestinationDir
-    -----------------------------------------------------------------                            
-    r2:|leFilename  | pbRename  | leDestinationDir | pbDestinationDir
-    -----------------------------------------------------------------
-    r3:|        lsFiles         |               pdfView              |
-    ------------------------------------------------------------------
-    r4: pbProgress
-    ------------------------------------------------------------------
-    */
+
     mainLayout.setContentsMargins(10,10,10,10);
 
     mainLayout.addWidget(&lbDestinationDir, 1, 3);
@@ -154,6 +190,7 @@ void MainWindow::createOtherWidgets() {
     mainLayout.addWidget(&pbDestinationDir, 2, 4);
     mainLayout.addWidget(&lsFiles, 3, 1, 1, 2);
     mainLayout.addWidget(&pdfView, 3, 3, 1, 2);
+    pdfView.setPageMode(QPdfView::PageMode::MultiPage);
     mainLayout.addWidget(&pbProgress, 4, 1, 1, 4);
 
     mainLayout.setColumnStretch(1, 1);
@@ -163,15 +200,31 @@ void MainWindow::createOtherWidgets() {
     
 }
 
+/**
+ * Creates a network menu entry for the given network profile.
+ *
+ * @param netProfile pointer to the network profile object
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void MainWindow::createNetworkMenuEntry(Settings::networkProfile *netProfile) {
     // if it is the default network profile, add it to the toolbar
     if (netProfile->isDefault) {
-        toolBar.addSeparator();
+        // New separator before renameAction
+        toolBar.insertSeparator(&renameAction);
+
+        // Setup toolbar button for default network profile
         tbDefaultNetworkEntry.setIcon(QIcon(":/images/network.png"));
         tbDefaultNetworkEntry.setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
         tbDefaultNetworkEntry.setText(netProfile->name.c_str());
         tbDefaultNetworkEntry.setProperty("Url", QVariant::fromValue(netProfile->url));
-        toolBar.addWidget(&tbDefaultNetworkEntry);
+        tbDefaultNetworkEntry.setProperty("IsRecursive", QVariant::fromValue(netProfile->isRecursive));
+        tbDefaultNetworkEntry.setProperty("DocumentProfileIndex", QVariant::fromValue(netProfile->documentProfileIndex));
+        toolBar.insertWidget(&renameAction, &tbDefaultNetworkEntry);
+        tbDefaultNetworkEntry.setToolTip(tr("Scan a directory on a remote server for pdf files."));
+
         QObject::connect(&tbDefaultNetworkEntry, &QToolButton::clicked, this, &MainWindow::openNetwork); 
             
         // if there are more entries, create a drop down menu
@@ -179,23 +232,48 @@ void MainWindow::createNetworkMenuEntry(Settings::networkProfile *netProfile) {
             tbNetworkProfiles.setIcon(QIcon(":/images/down_arrow.svg"));
             tbNetworkProfiles.setFixedWidth(10);
             tbDefaultNetworkEntry.setFixedWidth(networkProfileMenu->width()+ 10);
-            toolBar.addWidget(&tbNetworkProfiles);
+            tbNetworkProfileAction = toolBar.insertWidget(&renameAction, &tbNetworkProfiles);
             connect(&tbNetworkProfiles, &QToolButton::clicked, [&]() {
                 QPoint menuPos = tbDefaultNetworkEntry.mapToGlobal(QPoint(0, tbDefaultNetworkEntry.height()));
                 networkProfileMenu->exec(menuPos);
             });
         }
-        toolBar.addSeparator();
+        toolBar.insertSeparator(&renameAction);
     }
     // Add Profile to NetworkProfileMenu
     QAction *networkProfileAction = new QAction(netProfile->name.c_str(), this);
     networkProfileAction->setIcon(QIcon(":/images/network.png"));
-    QVariant profileData = QVariant::fromValue(netProfile->url);
-    networkProfileAction->setData(profileData);
+    networkProfileAction->setProperty("Url", QVariant::fromValue(netProfile->url));
+    networkProfileAction->setProperty("IsRecursive", QVariant::fromValue(netProfile->isRecursive));
+    networkProfileAction->setProperty("DocumentProfileIndex", QVariant::fromValue(netProfile->documentProfileIndex));
     networkProfileMenu->addAction(networkProfileAction);
     QObject::connect(networkProfileAction, &QAction::triggered, this, &MainWindow::openNetwork);
 }
 
+/**
+ * Creates document entries in the cbDocumentProfiles
+ *
+ * @throws None
+ */
+void MainWindow::createDocumentEntries() {
+    cbDocumentProfiles.clear();
+    for (int i = 0; i < settings.documentProfileCount(); i++) {
+        cbDocumentProfiles.addItem(QString::fromStdString(settings.DocumentProfile(i)->name), QVariant(i));
+    }
+    qDebug() << cbDocumentProfiles.count();
+    // Set the document profile to the active document profile of the default network profile
+    if (settings.networkProfileCount() > 0) {
+        cbDocumentProfiles.setCurrentIndex(settings.NetworkProfile(0)->documentProfileIndex - 1);
+    }
+}
+
+/**
+ * Sets the tab order for the widgets in the main window.
+ *
+ * This function sets the tab order for the widgets in the main window by calling the `QWidget::setTabOrder` function.
+ *
+ * @throws None
+ */
 void MainWindow::setTabOrder() {
     QWidget::setTabOrder(&lsFiles, &leFileName);
     QWidget::setTabOrder(&leFileName, &pbRename);
@@ -203,6 +281,11 @@ void MainWindow::setTabOrder() {
     QWidget::setTabOrder(&leDestinationDir, &pbDestinationDir);
 }
 
+/**
+ * Sets the text for various UI elements in the MainWindow.
+ *
+ * @throws None
+ */
 void MainWindow::setText() {
     this->setWindowTitle(tr("Scan2OCR"));
     leFileName.setText(tr("pdf file name"));
@@ -212,15 +295,33 @@ void MainWindow::setText() {
     pbDestinationDir.setText("...");
 }
 
+/**
+ * Calls the settings dialog after preparing the menu and toolbar.
+ *
+ * @throws None
+ */
 void MainWindow::settingsMenu() {
    SettingsUI settingsDialog;
    settingsDialog.showDialog();
+   settings.readValues();
 
     //Update (clear) networkMenu and toolBar
     if (tbDefaultNetworkEntry.parent() != nullptr) {
         QAction* actionToRemove = toolBar.findChild<QAction*>(tbDefaultNetworkEntry.objectName());
+        
         if (actionToRemove) {
             toolBar.removeAction(actionToRemove);
+        }
+        // Now remove all separators
+        for (QAction *action : toolBar.findChildren<QAction*>()) {
+            if (action->isSeparator()) {
+                toolBar.removeAction(action);
+            }
+        }
+        // If tbNetworkAction is used, remove it
+        if (tbNetworkProfileAction) {
+            toolBar.removeAction(tbNetworkProfileAction);
+            tbNetworkProfileAction = nullptr;
         }
     }
 
@@ -232,8 +333,20 @@ void MainWindow::settingsMenu() {
     for (int i=0; i < settings.networkProfileCount(); i++) {
         createNetworkMenuEntry(settings.NetworkProfile(i));
     }
+
+    // Set the default document directory
+    leDestinationDir.setText(settings.DestinationDir());
 }
 
+/**
+ * Displays the About dialog for the application with the version information.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void MainWindow::about() {
     QDialog aboutDialog;
     
@@ -261,6 +374,16 @@ void MainWindow::about() {
     aboutDialog.exec();
 }
 
+/**
+ * Opens a file dialog to select a PDF file. If a file is selected, a new
+ * ParseUrl object is created with the file path and newFileFound is called
+ * with the new ParseUrl object and a document profile index of 0 (the default). Finally,
+ * processFiles is called to process the newly found file.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void MainWindow::openFile(){
     QFileDialog FileDialog;
     QString File;
@@ -274,10 +397,19 @@ void MainWindow::openFile(){
     std::shared_ptr<ParseUrl>ptr_Url = std::make_shared<ParseUrl>("file://" + File.toStdString());
     
     // Process file
-    newFileFound(std::move(ptr_Url));
+    newFileFound(std::move(ptr_Url), cbDocumentProfiles.currentIndex());
     processFiles();
 }
 
+/**
+ * Opens a file dialog to select a directory path. If a valid path is selected, 
+ * creates a new instance of Directory with the selected path, connects signals 
+ * for new file found, and initializes the directory for processing files.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void MainWindow::openPath(){
  
     PathDialog pathDialog (this);
@@ -305,7 +437,7 @@ void MainWindow::openPath(){
         std::cout << "MainWindow::openPath() creating new instance of Directory " << url.Url() << " with parent_ptr to " << this << std::endl;
     #endif
     // Process directory
-    p_Directory = std::make_shared<Directory> (url, this, isRecursive);
+    p_Directory = std::make_shared<Directory> (url, this, isRecursive, cbDocumentProfiles.currentIndex());
 
     #ifdef DEBUG
         std::cout << "MainWindow::openPath() connecting foundNewFile at " << p_Directory.get() << " to newFileFound at" << this << std::endl;
@@ -315,21 +447,25 @@ void MainWindow::openPath(){
     processFiles();
 }
 
+/**
+ * Opens a network directory and initializes the corresponding Directory object.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void MainWindow::openNetwork() {
     QObject *senderObject = QObject::sender();
-    ParseUrl url;
-    bool isRecursive {true};
 
-    if (senderObject == static_cast<QObject*>(&tbDefaultNetworkEntry)) {
-        url = tbDefaultNetworkEntry.property("Url").value<ParseUrl>();
-    }
-    if (senderObject == networkProfileAction.get()) {
-        url = networkProfileAction->data().value<ParseUrl>();
-    }
+    bool isRecursive {senderObject->property("IsRecursive").toBool()};
+    ParseUrl url{senderObject->property("Url").value<ParseUrl>()};
+    int documentProfileIndex {senderObject->property("DocumentProfileIndex").toInt()};
+
     #ifdef DEBUG
         std::cout << "MainWindow::openNetwork() creating new instance of Directory " << url.Url() << " with parent_ptr to " << this << std::endl;
     #endif
-    p_Directory = std::make_shared<Directory> (url, this, isRecursive);
+
+    p_Directory = std::make_shared<Directory> (url, this, isRecursive, documentProfileIndex);
 
     #ifdef DEBUG
         std::cout << "MainWindow::openNetwork() connecting foundNewFile at " << p_Directory.get() << " to newFileFound at" << this << std::endl;
@@ -339,14 +475,32 @@ void MainWindow::openNetwork() {
     processFiles();
 }
 
-void MainWindow::newFileFound(std::shared_ptr<ParseUrl>ptr_Url) {
+/**
+ * Adds a new PDF file to the list of PDF files in the MainWindow.
+ *
+ * @param ptr_Url a shared pointer to a ParseUrl object representing the URL of the PDF file
+ * @param documentProfileIndex the index of the document profile to use for the new PDF file
+ *
+ * @throws None
+ */
+void MainWindow::newFileFound(std::shared_ptr<ParseUrl>ptr_Url, int documentProfileIndex) {
     #ifdef DEBUG
         std::cout << "MainWindow::newFileFound() on: " << ptr_Url->Url() << std::endl;
     #endif
     
-    vec_pdfFiles.emplace_back(std::make_shared<PdfFile> (*(ptr_Url), this));
+    vec_pdfFiles.emplace_back(std::make_shared<PdfFile> (*(ptr_Url), this, documentProfileIndex));
 }
 
+/**
+ * Processes the list of PDF files by initializing each file, adding its name to a list widget,
+ * and setting the current row if needed.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void MainWindow::processFiles() {
     for (auto &pdfFile : vec_pdfFiles) {
         pdfFile->initialize();
@@ -358,27 +512,38 @@ void MainWindow::processFiles() {
     }
 }
 
+/**
+ * Connects various signals and slots in the MainWindow.
+ *
+ * This function connects the signals and slots in the MainWindow to handle user interactions.
+ * It connects the following signals and slots:
+ * - When the user selects a file in the QListWidget lsFiles, the slot fileSelected() is called.
+ * - When the Rename button pbRename is clicked, the slot renameToFinalName() is called.
+ * - When the user presses Enter in the LineEdit leFileName, the slot renameToFinalName() is called.
+ * - When the user clicks the button pbDestinationDir to open a QFileDialog, the slot getDestinationDir() is called.
+ * - When the user changes the text in the LineEdit leDestinationDir, the slot directoryCompleter() is called.
+ *
+ * @throws None
+ */
 void MainWindow::connectSignals() {
-    // If the user has selected a file
     QObject::connect(&lsFiles, &QListWidget::itemSelectionChanged,
                       this, &MainWindow::fileSelected);
-
-    // If the Rename button has been clicked
     QObject::connect(&pbRename, &QPushButton::clicked,
-                      this, &MainWindow::save);
-
-    // If enter has been pressed in the LineEdit leFileName
+                      this, &MainWindow::renameToFinalName);
     QObject::connect(&leFileName, &QLineEdit::returnPressed,
-                      this, &MainWindow::save);
-
-    // If the user has clicked the button pbDestinationDir to open a QFileDialog
+                      this, &MainWindow::renameToFinalName);
     QObject::connect(&pbDestinationDir, &QPushButton::clicked,
                       this, &MainWindow::getDestinationDir);
-
-    // If the user has changed the text in the LineEdit leDestinationDir
     QObject::connect(&leDestinationDir, &QLineEdit::textChanged,
                       this, &MainWindow::directoryCompleter);
 }
+/**
+ * Selects a file from the QListWidget lsFiles and displays the pdf.
+ * Then the proposed file name is set in the LineEdit leFileName and
+ * it is selected without the file extension
+ *
+ * @throws None
+ */
 void MainWindow::fileSelected(){
     int Index = lsFiles.currentIndex().row();
     if (Index < 0) {
@@ -390,8 +555,9 @@ void MainWindow::fileSelected(){
     #endif
 
     leFileName.setText(QString::fromStdString(vec_pdfFiles.at(Index)->FileName()));
-
-    pdfDocument.load(vec_pdfFiles.at(Index)->returnFileContent().get());
+    QString pdfFile = QString::fromStdString(vec_pdfFiles.at(Index)->pdfFileName());
+    pdfDocument.load(pdfFile);
+    
     pdfView.setDocument(&pdfDocument);
     vec_pdfFiles.at(Index)->returnFileContent()->close();
 
@@ -404,6 +570,15 @@ void MainWindow::fileSelected(){
     }
 }
 
+/**
+ * Updates the statusbar of the MainWindow.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void MainWindow::statusUpdate() {
 
     if (vec_pdfFiles.size() > 0) {
@@ -416,11 +591,24 @@ void MainWindow::statusUpdate() {
     #endif
 }
 
+/**
+ * Sets the maximum value of the progress bar to the size of vec_pdfFiles
+ * and shows the progress bar.
+ *
+ * @return void
+ */
 void MainWindow::setMaxProgress(){
     pbProgress.setMaximum (vec_pdfFiles.size());
     pbProgress.show();
 }
 
+/**
+ * Deletes the file at the current row in the QListWidget lsFiles.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void MainWindow::deleteFileSlot(){
     // Check if we know what to delete and get the index
     if (lsFiles.count() == 0) {
@@ -430,11 +618,25 @@ void MainWindow::deleteFileSlot(){
     deleteFile(element);
 }
 
+/**
+ * Closes the main window and quits the application.
+ *
+ * @return void
+ *
+ * @throws None
+ */
 void MainWindow::cancel(){
     this->close();
     qApp->quit();
 }
 
+/**
+ * Deletes the file at the specified index in the vector of PdfFiles and removes the corresponding item from the QListWidget.
+ *
+ * @param element The index of the file to delete in the vector of PdfFiles.
+ *
+ * @throws None
+ */
 void MainWindow::deleteFile (const int element) {
     if (vec_pdfFiles.at(element)) {
         // Remove scanned File
@@ -446,8 +648,15 @@ void MainWindow::deleteFile (const int element) {
     }
 }
 
-void MainWindow::save() {
-    // Check if we know what to save
+/**
+ * Renames the file to the final name and removes the corresponding item from the QListWidget.
+ *
+ * @return void
+ *
+ * @throws std::filesystem::filesystem_error if there are errors during file copying or removal.
+ */
+void MainWindow::renameToFinalName() {
+    // Check if we know the final name
     if (lsFiles.count() == 0) {
         return;
     }
@@ -473,22 +682,38 @@ void MainWindow::save() {
     }
 
     const int element {lsFiles.currentRow()};
-
-    //Save pdf to disk and remove element if no error
-    bool retVal = vec_pdfFiles.at(element)->saveToFile(destinationDir + leFileName.text().toStdString());
+    
+    bool retVal = vec_pdfFiles.at(element)->renameToFileName(destinationDir + leFileName.text().toStdString());
     if (retVal) {
         vec_pdfFiles.at(element)->removeFile();
         lsFiles.takeItem(element);
         (element > 0) ? lsFiles.setCurrentRow(element-1) : pdfDocument.close();
     }
+    else {
+        QMessageBox::critical(this, tr("Error while renaming file"), tr("Error while renaming file"));
+    }
 }
 
+/**
+ * Retrieves an existing directory from the user and sets it as the destination directory in the UI.
+ *
+ * @throws None
+ */
 void MainWindow::getDestinationDir(){
     QFileDialog PathDialog;
     QString destDir = PathDialog.getExistingDirectory(this, tr("Choose target directory"), settings.DestinationDir());
     leDestinationDir.setText(destDir);
 }
 
+/**
+ * Generates a completer model for directories based on the given text.
+ *
+ * @param text The text to use as the base for directory search.
+ *
+ * @return None.
+ *
+ * @throws None.
+ */
 void MainWindow::directoryCompleter(const QString &text) {
     QStringList dirNames;
     std::string parentDir = text.toStdString();
@@ -508,6 +733,15 @@ void MainWindow::directoryCompleter(const QString &text) {
     completer.setModel(new QStringListModel(dirNames, &completer));
 }
 
+/**
+ * Hides the progress bar when all files are processed.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 void MainWindow::filesProcessed() {
     #ifdef DEBUG
         std::cout << "MainWindow::filesProcessed() from " << this << std::endl;
@@ -515,6 +749,15 @@ void MainWindow::filesProcessed() {
     pbProgress.hide();
 }
 
+/**
+ * Checks if the text content of a QLineEdit is the same as the default value.
+ * If it is, sets the text color to red and returns false. Otherwise, returns true.
+ *
+ * @param LineEdit The QLineEdit to check.
+ * @param Default The default value to compare against.
+ *
+ * @return True if the text content is different from the default value, false otherwise.
+ */
 bool::MainWindow::Modified(QLineEdit *LineEdit, const std::string Default){
     QPalette Warnfarbe;
     Warnfarbe.setColor(QPalette::Text, QColor(Qt::red));
@@ -530,7 +773,12 @@ bool::MainWindow::Modified(QLineEdit *LineEdit, const std::string Default){
     }
 }
 
-void MainWindow::deleteText () {
+/**
+ * Sets the color of a QLineEdit to black.
+ *
+ * @throws None
+ */
+void MainWindow::TextToBlack () {
     QPalette Color;
     QLineEdit* leSender = qobject_cast<QLineEdit*>(sender());
 
@@ -542,7 +790,13 @@ void MainWindow::deleteText () {
     leSender->selectAll();
 }
 
-// Custom PathDialog with Checkbox to choose if subdirectories should be scanned
+
+/**
+ * Adds a custom widget to the PathDialog, which includes a checkbox to choose
+ * whether subdirectories should be scanned.
+ *
+ * @throws None
+ */
 void PathDialog::addWidget() {
     setOption(QFileDialog::DontUseNativeDialog);
      QGridLayout* mainLayout = dynamic_cast <QGridLayout*>(this->layout());
@@ -554,6 +808,13 @@ void PathDialog::addWidget() {
         }
 }
 
+/**
+ * A const member function that returns the state of the cbRecursive checkbox.
+ *
+ * @return the boolean value indicating whether the checkbox is checked
+ *
+ * @throws None
+ */
 bool PathDialog::isRecursive() const {
     return cbRecursive.isChecked();    
 }
@@ -573,4 +834,4 @@ bool PathDialog::isRecursive() const {
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
-    */
+*/

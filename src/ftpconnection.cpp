@@ -1,10 +1,26 @@
 #include "ftpconnection.h"
 
+/**
+ * Destructor for the FtpConnection class.
+ *
+ * @param None
+ *
+ * @return None
+ *
+ * @throws None
+ */
 FtpConnection::~FtpConnection() {
     // To be sure, disconnect everything if not already done
     disconnect();
 }
 
+/**
+ * Constructs a new FtpConnection object.
+ *
+ * @param Url The ParseUrl object containing the necessary information for the connection.
+ *
+ * @throws None
+ */
 FtpConnection::FtpConnection(const ParseUrl &Url) : RemoteHost(Url.Host()), 
     Port(Url.Port()), Filename(Url.Filename()), 
     Directory(Url.Directory()), 
@@ -15,6 +31,13 @@ FtpConnection::FtpConnection(const ParseUrl &Url) : RemoteHost(Url.Host()),
         #endif
 }
 
+/**
+ * Establishes a connection to the FTP server using SSH protocol.
+ *
+ * @return void
+ *
+ * @throws std::runtime_error if there is an error during the connection process.
+ */
 void FtpConnection::getConnection() {
 
     if (session == NULL) {
@@ -79,6 +102,14 @@ void FtpConnection::getConnection() {
         connected = true;
     }
 }
+/**
+ * Disconnects from the FTP server and frees associated resources.
+ *
+ * This function releases the SFTP session and the SSH session, and sets their
+ * respective pointers to null. 
+ *
+ * @throws None
+ */
 void FtpConnection::disconnect() {
     sftp_free(sftp);
     sftp = nullptr;
@@ -87,6 +118,13 @@ void FtpConnection::disconnect() {
     session = nullptr;
 }
 
+/**
+ * Deletes a file on the FTP server.
+ *
+ * @return true if the file was successfully deleted, false otherwise
+ *
+ * @throws None
+ */
 bool FtpConnection::deleteFile() {
     getConnection();
 
@@ -111,7 +149,14 @@ bool FtpConnection::deleteFile() {
     return true;
 }
 
-std::unique_ptr<Magick::Blob> FtpConnection::getFile() {
+/**
+ * Retrieves a file from the FTP server and returns its contents as a unique pointer to a string.
+ *
+ * @return A unique pointer to a string containing the file contents, or nullptr if an error occurs.
+ *
+ * @throws None
+ */
+std::unique_ptr<std::string> FtpConnection::getFilePtr() {
     getConnection();
 
     sftp_file remoteFile = sftp_open(sftp, (Directory + "/" + Filename).c_str(), O_RDONLY, 0);
@@ -128,7 +173,6 @@ std::unique_ptr<Magick::Blob> FtpConnection::getFile() {
     while ((nbytes = sftp_read(remoteFile, buffer, sizeof(buffer))) > 0) {
         ss.append(buffer, nbytes);
     }
-    Magick::Blob blob (ss.data(), ss.length());
 
     // Check for errors
     if (nbytes < 0) {
@@ -145,9 +189,18 @@ std::unique_ptr<Magick::Blob> FtpConnection::getFile() {
         return nullptr;
     }
     disconnect();
-    return std::make_unique<Magick::Blob>(std::move(blob));
+    return std::make_unique<std::string>(std::move(ss));
 }
 
+/**
+ * Retrieves the list of files in the remote directory.
+ *
+ * @param isRecursive Flag indicating whether to recursively search subdirectories.
+ *
+ * @return A unique pointer to a vector of strings containing the file paths.
+ *
+ * @throws None
+ */
 std::unique_ptr<std::vector<std::string>> FtpConnection::getRemoteDir(bool isRecursive) {
     std::unique_ptr<std::vector<std::string>> files = std::make_unique<std::vector<std::string>>();
     sftp_dir dir;

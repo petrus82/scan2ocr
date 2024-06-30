@@ -24,6 +24,7 @@
 #include <QLayout>
 #include <QMenuBar>
 #include <QToolBar>
+#include <QScrollBar>
 #include <qpdfview.h>
 
 QT_BEGIN_NAMESPACE
@@ -54,11 +55,11 @@ public:
 
 public slots:
     //void loadPdf(const QString &fileName);
-    void newFileFound(std::shared_ptr<ParseUrl>ptr_Url);
+    void newFileFound(std::shared_ptr<ParseUrl>ptr_Url, int documentProfileIndex);
     void statusUpdate();
     void filesProcessed();
     void setMaxProgress();
-    void save();
+    void renameToFinalName();
     void getDestinationDir();
     void deleteFileSlot();
 
@@ -71,12 +72,13 @@ private slots:
     void settingsMenu();
     void cancel();
     void about();
-    void deleteText ();
+    void TextToBlack ();
 
 private:
 
     void createMenu();
     void createNetworkMenuEntry (Settings::networkProfile *netProfile);
+    void createDocumentEntries ();
     void createOtherWidgets();
     void setTabOrder();
     void setText();
@@ -109,9 +111,9 @@ private:
     QAction cancelAction {tr("&Quit"), this};
     QAction aboutAction {tr("Abou&t"), this};
     QToolButton tbDefaultNetworkEntry {&toolBar};
+    QAction *tbNetworkProfileAction {nullptr};
     QToolButton tbNetworkProfiles {&toolBar};
-
-    std::unique_ptr<QAction> networkProfileAction;
+    QComboBox cbDocumentProfiles {nullptr};
 
     std::vector <std::shared_ptr<PdfFile>> vec_pdfFiles;    
     std::shared_ptr<Directory> p_Directory;                 

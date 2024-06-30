@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <libssh/libssh.h>
 #include <libssh/sftp.h>
-#include <Magick++.h>
 #include "parseurl.h"
 #include "settings.h"
 #include "scan2ocr.h"
@@ -32,15 +31,15 @@ public:
 
     bool deleteFile();
     bool connected = false;
-    std::unique_ptr<Magick::Blob> getFile();
-
+    std::unique_ptr<std::string> getFilePtr();
+    
     std::unique_ptr<std::vector<std::string>> getRemoteDir(bool isRecursive);
 };
 
 #endif // FTPCONNECTION_H
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.
-    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettger.der
+    Copyright (C) 2024 Simon-Friedrich Böttger email (at) simonboettge . de
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

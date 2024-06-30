@@ -1,22 +1,18 @@
 cmake_minimum_required(VERSION 3.5)
-project(scan2ocr VERSION "0.0.3" LANGUAGES CXX)
+project(scan2ocr VERSION "0.0.4" LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
+#set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS_DEBUG  "-g")
+set(CMAKE_CXX_FLAGS_DEBUG  "-g -ggdb")
 
 find_package(ECM REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets PdfWidgets LinguistTools)
-find_package(ImageMagick COMPONENTS Magick++)
-find_package(Poppler REQUIRED)
-message(STATUS "Poppler_Cpp_LIBRARIES: ${Poppler_Cpp_LIBRARIES}")
-
-find_library(MAGICK_CORE_LIBRARY NAMES libMagickCore-7.Q16HDRI.so PATHS /usr/lib/)
 
 find_library(Leptonica_LIBRARIES NAMES libleptonica.so PATHS /usr/lib/)
 find_library(libssh_LIBRARIES NAMES libssh.so PATHS /usr/lib/)
@@ -30,9 +26,6 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Set debug flags
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-
 set(SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(SOURCE_FILES
   CMakeLists.txt
@@ -45,6 +38,7 @@ set(SOURCE_FILES
   src/settings.cpp
   src/mainwindow.h
   src/pdffile.h
+  src/BS_thread_pool.hpp
   src/ftpconnection.h
   src/parseurl.h
   src/scan2ocr.h
@@ -56,7 +50,7 @@ qt_add_executable(scan2ocr
 )
 
 # Add translation
-qt6_add_translations(scan2ocr TS_FILES german.ts LUPDATE_OPTIONS -no-obsolete)
+qt_add_translations(scan2ocr TS_FILES german.ts RESOURCE_PREFIX "translations" LUPDATE_OPTIONS -no-obsolete)
 
 add_dependencies(scan2ocr scan2ocr_lupdate)
 add_dependencies(scan2ocr update_translations)
@@ -64,18 +58,14 @@ add_dependencies(scan2ocr update_translations)
 target_include_directories(scan2ocr PRIVATE
     ${CMAKE_PROJECT_INCLUDE_DIR}
     ${libssh_INCLUDE_DIRS}
-    ${ImageMagick_INCLUDE_DIRS}
-    ${ImageMagick_Magick}
+#    ${ImageMagick_INCLUDE_DIRS}
+#    ${ImageMagick_Magick}
     ${Leptonica_INCLUDE_DIRS}
     ${Tesseract_INCLUDE_DIRS}
-    ${Poppler_INCLUDE_DIRS}
 )
 
 target_compile_options(scan2ocr PRIVATE
     -fopenmp
-    -DMAGICKCORE_HDRI_ENABLE=1
-    -DMAGICKCORE_CHANNEL_MASK_DEPTH=32
-    -DMAGICKCORE_QUANTUM_DEPTH=16
     -DPROGRAM_VERSION="${PROJECT_VERSION}"
 )
 
@@ -90,16 +80,11 @@ else()
 endif()
 
 target_link_libraries(scan2ocr PRIVATE
-    ${ImageMagick_LIBRARIES}
-    ${ImageMagick_Magick}
-    ${MAGICK_CORE_LIBRARY}
     ${Leptonica_LIBRARIES}
     ${Tesseract_LIBRARIES}
     ${libssh_LIBRARIES}
     ${Leptonica_LIBRARIES}
     ${libssh_LIBRARIES}
-    ${Poppler_LIBRARIES}
-    Poppler::Cpp
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
@@ -108,8 +93,8 @@ target_link_libraries(scan2ocr PRIVATE
 
 install(TARGETS scan2ocr DESTINATION bin)
 
-set(CPACK_PACKAGE_NAME "scan2ocr")
-set(CPACK_PACKAGE_VERSION "0.0.3")
+set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Convert scanned files to black/white PDFs with text using OCR.")
 set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}")
 set(CPACK_GENERATOR "TGZ")
