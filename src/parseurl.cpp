@@ -34,13 +34,7 @@ ParseUrl::ParseUrl (const std::string Url) {
     }
     // Check if port is present
     if (m_url.find(":", beginSearch) != std::string::npos) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::host31: " << host <<", @" << &host << std::endl;
-        #endif
         host = m_url.substr(beginSearch, m_url.find(":", beginSearch) - beginSearch);
-        #ifdef DEBUG
-            std::cout << "ParseUrl::host35: " << host <<", @" << &host << std::endl;
-        #endif
         beginSearch = m_url.find(":", beginSearch) + 1;
         try
         {
@@ -54,13 +48,7 @@ ParseUrl::ParseUrl (const std::string Url) {
         }
     }
     else if (scheme == "sftp") { // No Port and host should be present
-        #ifdef DEBUG
-            std::cout << "ParseUrl::host:51: " << host <<", @" << &host << std::endl;
-        #endif
         host = m_url.substr(beginSearch, m_url.find("/", beginSearch) - beginSearch);
-        #ifdef DEBUG
-            std::cout << "ParseUrl::host:55: " << host <<", @" << &host << std::endl;
-        #endif
         beginSearch = m_url.find("/", beginSearch);
     }
 
@@ -114,9 +102,6 @@ void ParseUrl::Scheme (const std::string Scheme) {
  */
 void ParseUrl::Host (const std::string Host) {
     if (Host.length() > 0) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::Host:92: " << Host << std::endl;
-        #endif
         host = Host;    
     }
 }
@@ -132,9 +117,6 @@ void ParseUrl::Host (const std::string Host) {
  */
 void ParseUrl::Directory (const std::string Directory) {
     if (Directory.length() > 3) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::Directory: Directory=" << Directory << std::endl;
-        #endif
         directory = Directory;
     }
 }
@@ -150,9 +132,6 @@ void ParseUrl::Directory (const std::string Directory) {
  */
 void ParseUrl::Filename (const std::string Filename) {
     if (Filename.length() > 4) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::Filename: Filename=" << Filename << std::endl;
-        #endif
         filename = Filename;
     }
 }
@@ -166,9 +145,6 @@ void ParseUrl::Filename (const std::string Filename) {
  */
 void ParseUrl::RawFilename (const std::string RawFilename) {
     if (RawFilename.length() > 4) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::RawFilename: RawFilename=" << RawFilename << std::endl;
-        #endif
         rawFilename = RawFilename;
     }
 }
@@ -186,12 +162,6 @@ void ParseUrl::FileDir (const std::string FileDir) {
         directory = FileDir.substr(0, lastSlashPosition + 1);
         filename = FileDir.substr(lastSlashPosition + 1);
         rawFilename = filename.substr(0, filename.length() - 4);
-        
-        #ifdef DEBUG
-            std::cout << "ParseUrl::FqFilename: FqFilename=" << FileDir << std::endl;
-            std::cout << "ParseUrl::FqFilename: directory=" << directory << std::endl;
-            std::cout << "ParseUrl::FqFilename: filename=" << filename << std::endl;
-        #endif
     }
 }
 
@@ -216,9 +186,6 @@ std::string ParseUrl::FileDir () const {
  */
 void ParseUrl::Password (const std::string Password) {
     if (Password.length() > 0) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::Password: Password=" << Password << std::endl;
-        #endif
         password = Password;
     }
 }
@@ -233,9 +200,6 @@ void ParseUrl::Password (const std::string Password) {
  */
 void ParseUrl::Username (const std::string Username) {
     if (Username.length() > 0) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::Username: Username=" << Username << std::endl;
-        #endif
         username = Username;
     }
 }
@@ -249,9 +213,6 @@ void ParseUrl::Username (const std::string Username) {
  * @throws None
  */
 void ParseUrl::Port (const int Port) {
-    #ifdef DEBUG
-        std::cout << "ParseUrl::Port: Port=" << Port << std::endl;
-    #endif
     port = Port;
 }
 
@@ -286,9 +247,6 @@ std::string ParseUrl::Url() {
         }
         m_url = "sftp://" + m_url;
     }
-    #ifdef DEBUG
-        std::cout << "ParseUrl::Url: Url=" << m_url << std::endl;
-    #endif
     return m_url;
 }
 
@@ -303,9 +261,6 @@ std::string ParseUrl::Url() {
  */
 void ParseUrl::Url (std::string Url) {
     if (Url.length() > 7) {
-        #ifdef DEBUG
-            std::cout << "ParseUrl::Url: Url=" << Url << std::endl;
-        #endif
         m_url = Url;
     }
 }

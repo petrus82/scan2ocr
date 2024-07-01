@@ -26,9 +26,6 @@ FtpConnection::FtpConnection(const ParseUrl &Url) : RemoteHost(Url.Host()),
     Directory(Url.Directory()), 
     Username(Url.Username()), 
     FtpPassword(Url.Password()) {
-        #ifdef DEBUG
-            std::cout << "FtpConnection(): Connecting to " << RemoteHost << ":" << Port << Directory << Filename << std::endl;
-        #endif
 }
 
 /**
@@ -230,11 +227,6 @@ std::unique_ptr<std::vector<std::string>> FtpConnection::getRemoteDir(bool isRec
                 continue;
             } else if (fileName.substr(fileName.length() - 3, 3) == "pdf") {
                 files->push_back(subDirectory + fileName);
-
-                #ifdef DEBUG
-                    std::cout << "FtpConnection::getRemoteDir: Found file: " << files->back() << std::endl;
-                #endif
-                
             } else if (attributes->permissions & S_IFDIR && isRecursive) {
                 readDirectory(subDirectory + fileName);
             }

@@ -146,27 +146,27 @@
         <translation>PDF Dateien *.pdf</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="673"/>
+        <location filename="src/mainwindow.cpp" line="671"/>
         <source>Directory does not exist</source>
         <translation>Verzeichnis existiert nicht</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="673"/>
+        <location filename="src/mainwindow.cpp" line="671"/>
         <source>This directory does not exist. Do you want to create it?</source>
         <translation>Dieses Verzeichnis gibt es nicht. Wollen Sie es erstellen?</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="679"/>
+        <location filename="src/mainwindow.cpp" line="677"/>
         <source>Error while creating directory</source>
         <translation>Fehler bei der Verzeichnis Erstellung</translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="693"/>
+        <location filename="src/mainwindow.cpp" line="691"/>
         <source>Error while renaming file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/mainwindow.cpp" line="704"/>
+        <location filename="src/mainwindow.cpp" line="702"/>
         <source>Choose target directory</source>
         <translation>Zielverzeichnis auswählen</translation>
     </message>
@@ -179,7 +179,7 @@
 <context>
     <name>PathDialog</name>
     <message>
-        <location filename="src/mainwindow.cpp" line="804"/>
+        <location filename="src/mainwindow.cpp" line="802"/>
         <source>Loop through subdirectories</source>
         <translation>Unterverzeichnisse durchsuchen</translation>
     </message>
@@ -187,24 +187,24 @@
 <context>
     <name>PdfFile</name>
     <message>
-        <location filename="src/pdffile.cpp" line="441"/>
-        <location filename="src/pdffile.cpp" line="452"/>
+        <location filename="src/pdffile.cpp" line="480"/>
+        <location filename="src/pdffile.cpp" line="491"/>
         <source>Error</source>
         <translation>Fehler</translation>
     </message>
     <message>
-        <location filename="src/pdffile.cpp" line="441"/>
-        <location filename="src/pdffile.cpp" line="452"/>
+        <location filename="src/pdffile.cpp" line="480"/>
+        <location filename="src/pdffile.cpp" line="491"/>
         <source>Error deleting file </source>
         <translation>Fehler beim Löschen der Datei </translation>
     </message>
     <message>
-        <location filename="src/pdffile.cpp" line="474"/>
+        <location filename="src/pdffile.cpp" line="513"/>
         <source>Warning</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="src/pdffile.cpp" line="474"/>
+        <location filename="src/pdffile.cpp" line="513"/>
         <source>File already exists, overwrite?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -212,7 +212,7 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="src/pdffile.cpp" line="374"/>
+        <location filename="src/pdffile.cpp" line="414"/>
         <source>Invoice</source>
         <translation>Rechnung</translation>
     </message>

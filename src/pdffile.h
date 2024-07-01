@@ -7,6 +7,7 @@
 // Tesseract api
 #include <tesseract/baseapi.h>
 #include <tesseract/renderer.h>
+#include <tesseract/ocrclass.h>
 #include <leptonica/allheaders.h>
 
 //Qt 6.x
@@ -34,9 +35,7 @@ public:
     std::shared_ptr<QIODevice> returnFileContent();
     const char *pdfFileName() { return tempFileName.c_str(); };
 
-    const int getStatusIncrement () { 
-        return  maxStatusIncrement;
-    };
+    int Progress () const { return myProgress; };
 
 signals:
     // New status value
@@ -46,10 +45,17 @@ signals:
 
 private:
     // How many times statusChange is emitted for one image page
-    static constexpr int cStatusIncrement = 4;
+    // Will be 100 x from monitor->progress and 4 x from other functions
+    //static constexpr int cStatusIncrement = 104; 
+
+    enum timeConstants {
+        MEMORY = 5,
+        TRANSCODE = 15,
+        OCR = 80
+    };
 
     // How many times statusChange will be called in total from this class
-    int maxStatusIncrement {0};
+    int NumberOfPages {0};
 
     ParseUrl m_Url;
     QObject m_parent;
@@ -68,6 +74,11 @@ private:
     bool isEmptyPage(Pix *pix);
     void transcode (Pix *&pix);
     void ocrPage (Pix *pix, int page);
+
+    void monitorProgress(tesseract::ETEXT_DESC *monitor, int paget);
+    void ocrProcess(tesseract::TessBaseAPI *api, tesseract::ETEXT_DESC *monitor);
+
+    int myProgress {0};
 
     std::string m_possibleFileName {""};
     void getFileName();

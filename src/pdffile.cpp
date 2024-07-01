@@ -1,4 +1,5 @@
 #include "pdffile.h"
+#include "scan2ocr.h"
 
 // From https://github.com/bshoshany/thread-pool:
 #include "BS_thread_pool.hpp"
@@ -118,13 +119,12 @@ void PdfFile::readData(const std::string *pdfData) {
     startPDF();
 
     // Extract every image stream
-    const int pages = imageStreamPositions.size();
-    maxStatusIncrement = pages * cStatusIncrement;
+    NumberOfPages = imageStreamPositions.size();
 
     BS::thread_pool threadPool;
     #define MULTITHREAD
 
-    for (int i = 0; i < pages; i++) {
+    for (int i = 0; i < NumberOfPages; i++) {
     #ifdef MULTITHREAD
         threadPool.detach_task(
             [&]
@@ -209,11 +209,15 @@ void PdfFile::processImage (const std::string *imageStringData, int page) {
     // First create l_uint8 from std::string
     const l_uint8 *l_uint8Ptr = (const unsigned char *) imageStringData->c_str();
     size_t length {imageStringData->size()};
+    
     Pix *pix {pixReadMem(l_uint8Ptr, length)};
+    myProgress = timeConstants::MEMORY;
+    emit statusChange();
 
     if (!isEmptyPage(pix)) {
-        transcode(pix);
-        ocrPage(pix, page);
+            transcode(pix);
+            ocrPage(pix, page);
+
         if (page == 0) {
             getFileName();
         }   
@@ -273,7 +277,6 @@ bool PdfFile::isEmptyPage(Pix *pix) {
 
     pixGetPixelAverage(pix, pixm, x, y, factor, imageAverage.get());
     double mean_val = static_cast<double>(*imageAverage) / static_cast<double>(std::numeric_limits<l_uint32>::max());
-    emit statusChange();
     return (mean_val > settings.thresholdValue()); 
 }
 
@@ -290,6 +293,7 @@ void PdfFile::transcode(Pix *&pix) {
         if (!documentProfile.isColored) {
             pix = pixCleanImage(pix, 5, 0, 1, 0);
         }
+        myProgress = timeConstants::TRANSCODE;
         emit statusChange();
 }
 
@@ -302,15 +306,54 @@ void PdfFile::transcode(Pix *&pix) {
  * @return None
  *
  * @throws None
+ * 
+ * 
  */
 void PdfFile::ocrPage(Pix *pix, int page) {
     ocr.SetImage(pix);
-    bool failed = ocr.Recognize(nullptr) < 0;
-    failed = !renderer->AddImage(&ocr);
 
+    tesseract::ETEXT_DESC monitor;
+    bool failed {true};
+
+    std::thread recognize_thread(std::bind(&PdfFile::ocrProcess, this, &ocr, &monitor));
+    std::thread monitor_thread(std::bind(&PdfFile::monitorProgress, this, &monitor, page)); 
+    recognize_thread.join();
+    monitor_thread.join();
+
+    renderer->AddImage(&ocr);
+
+    myProgress = timeConstants::OCR;
     emit statusChange();
 }
 
+void PdfFile::ocrProcess(tesseract::TessBaseAPI *ocr, tesseract::ETEXT_DESC *monitor) {
+    bool failed = ocr->Recognize(monitor) < 0;
+}
+
+void PdfFile::monitorProgress(tesseract::ETEXT_DESC *monitor, int page) {
+    // The starting Percentage before the ocr has started
+    constexpr int minimalPercentage = timeConstants::TRANSCODE;   
+    // The fraction of 100% after all ocr is done
+    constexpr float maxOCRProgress = timeConstants::OCR / 100.0f;
+    const float pageFraction = static_cast<float>(page + 1) / static_cast<float>(NumberOfPages);
+    const float minimalProgress = static_cast<float>(minimalPercentage) * pageFraction;
+
+    int monitorProgress {0};
+    while (1) {
+        if (monitorProgress != monitor->progress) {
+            monitorProgress = monitor->progress;
+            const int ocrProgress = minimalProgress + static_cast<float>(monitorProgress) * maxOCRProgress * pageFraction;
+
+            // Emit the total progress of this file
+            if (myProgress < ocrProgress) {
+                myProgress = ocrProgress;
+                emit statusChange();
+            }
+        }
+        if (monitorProgress >= 100 || monitorProgress < 0) break;
+    }
+
+}
 /**
  * Retrieves the file name for the PDF file based on the text content of the file.
  *
@@ -357,9 +400,6 @@ void PdfFile::getFileName() {
         resultIterator->WordFontAttributes(&is_bold, &is_italic, &is_underlined, &is_monospace, &is_serif, &is_smallcaps, &pointsize, &font_id);
     
         textVector.emplace_back(textElement{text, pointsize});
-        #ifdef DEBUG
-            std::cout << text << ": " << pointsize << std::endl;
-        #endif
         resultIterator->Next(level);
     }
 
@@ -422,7 +462,6 @@ void PdfFile::getFileName() {
     }
 
     m_possibleFileName += ".pdf";
-    emit statusChange();
 }
 
 /**

@@ -581,14 +581,12 @@ void MainWindow::fileSelected(){
  */
 void MainWindow::statusUpdate() {
 
-    if (vec_pdfFiles.size() > 0) {
-        pbProgress.setMaximum (vec_pdfFiles.size() * vec_pdfFiles.front()->getStatusIncrement());
-        pbProgress.value() < 0 ? pbProgress.setValue(1) : pbProgress.setValue(pbProgress.value() + 1);
-    }    
-    #ifdef DEBUG
-        std::cout << "MainWindow::statusUpdate() from " << this << ", pbProgress: " << pbProgress.value() << std::endl;
-        std::cout << "vec_pdfFiles.size(): " << vec_pdfFiles.size() << ", getStatusIncrement(): " << vec_pdfFiles.front()->getStatusIncrement() << ", pbProgress.maximum(): " << pbProgress.maximum() << std::endl;
-    #endif
+    static int totalProgress {0};
+    for (int i=0; i < vec_pdfFiles.size(); i++) {
+        totalProgress += vec_pdfFiles.at(i)->Progress();
+    }
+
+    pbProgress.setValue(totalProgress / vec_pdfFiles.size());
 }
 
 /**
@@ -598,7 +596,7 @@ void MainWindow::statusUpdate() {
  * @return void
  */
 void MainWindow::setMaxProgress(){
-    pbProgress.setMaximum (vec_pdfFiles.size());
+    pbProgress.setMaximum (100);
     pbProgress.show();
 }
 

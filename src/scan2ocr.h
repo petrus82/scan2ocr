@@ -7,6 +7,21 @@
 #include "parseurl.h"
 
 std::string getUniqueFileName();
+class MeasurePerformance {
+public:
+    MeasurePerformance(std::string name) : start(std::chrono::high_resolution_clock::now()), m_name(name) {
+    }
+
+    ~MeasurePerformance() {
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_time = (end - start) * 1000;
+        std::cout << "Elapsed time for " << m_name << ": " << elapsed_time.count() << " ms" << std::endl;
+    }
+
+private:
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    std::string m_name;
+};
 
 #endif // SCAN2OCR_H
 

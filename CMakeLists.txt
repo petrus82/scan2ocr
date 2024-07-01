@@ -4,8 +4,8 @@ project(scan2ocr VERSION "0.0.4" LANGUAGES CXX)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-#set(CMAKE_BUILD_TYPE "Debug")
-set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Debug")
+#set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG  "-g -ggdb")
 
@@ -58,8 +58,6 @@ add_dependencies(scan2ocr update_translations)
 target_include_directories(scan2ocr PRIVATE
     ${CMAKE_PROJECT_INCLUDE_DIR}
     ${libssh_INCLUDE_DIRS}
-#    ${ImageMagick_INCLUDE_DIRS}
-#    ${ImageMagick_Magick}
     ${Leptonica_INCLUDE_DIRS}
     ${Tesseract_INCLUDE_DIRS}
 )
