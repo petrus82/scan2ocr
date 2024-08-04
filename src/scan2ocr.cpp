@@ -8,6 +8,7 @@
 #include <QResource>
 #include <QTranslator>
 #include "mainwindow.h"
+#include "chatwindow.h"
 
 namespace constants {
     const std::string PathDestination = []() {
@@ -44,6 +45,15 @@ int main (int argc,char **argv){
 
     QApplication app(argc, argv);
     
+    // Setup application style using css file
+    QFile cssFile(":/src/application-style.css");
+    if (cssFile.open(QFile::ReadOnly)) {
+        QTextStream styleStream(&cssFile);
+        QString stylesheet = styleStream.readAll();
+        cssFile.close();
+        app.setStyleSheet(stylesheet);
+    }
+
     // Setup translations
     QTranslator translator;
     QCoreApplication::setApplicationName("scan2ocr");
@@ -56,6 +66,7 @@ int main (int argc,char **argv){
         if (!retval) std::cerr << "Could not install German translation" << std::endl;
     }
     
+    // Set application version
     #ifdef PROGRAM_VERSION
         QCoreApplication::setApplicationVersion(PROGRAM_VERSION);
     #endif
@@ -63,6 +74,22 @@ int main (int argc,char **argv){
 
     MainWindow mainWindow;
     mainWindow.show();
+
+    chatWindow chatwindow;
+
+    // Create lambda test answer function
+    auto testAnswerFunction = [&](){ 
+        std::shared_ptr<std::string>theQuestion = chatwindow.currentQuestion();
+        std::string myanswer {"test answer\n"};
+        chatwindow.updateAnswer(&myanswer);
+
+        myanswer = "with an update\n";
+        chatwindow.updateAnswer(&myanswer);
+    };
+
+    chatwindow.setAnswerCallBack(testAnswerFunction);
+    chatwindow.show();
+
     return app.exec();
 }
 

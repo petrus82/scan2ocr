@@ -51,8 +51,8 @@ void chatWindow::newQuestion() {
     textPrompt.clear();
     QCoreApplication::processEvents();
 
-    if (answerCallback) {
-        answerCallback();
+    if (answerCallBackPtr) {
+        answerCallBackPtr();
     }
 }
 
@@ -68,8 +68,8 @@ void chatWindow::newAnswer(QString answer) {
     
     scrollLayout.addWidget(newAnswer.get());
     
-    
     // Scroll to bottom
+    // Is there a way around calling ... setValue() twice?
     scrollArea.widget()->resize(scrollArea.widget()->sizeHint());
     QCoreApplication::processEvents();
     scrollArea.verticalScrollBar()->setValue(scrollArea.verticalScrollBar()->maximum());
@@ -77,6 +77,26 @@ void chatWindow::newAnswer(QString answer) {
     scrollArea.verticalScrollBar()->setValue(scrollArea.verticalScrollBar()->maximum());
 
     qlabel_Answers.push_back(std::move(newAnswer));
+}
+
+void chatWindow::updateAnswer(std::string *answer) {
+    // Check if we need to create a new answer
+    if (qlabel_Answers.size() < qlabel_Questions.size()) {
+        newAnswer(QString::fromStdString(*answer));
+    }
+    else { 
+        // There should be already an answer, it's only needs an update
+        if (qlabel_Answers.size() > 0) {
+            std::string currentAnswer {qlabel_Answers.back()->text().toStdString()};
+
+            // Write the new characters to the answer   
+            qlabel_Answers.back()->setText(QString::fromStdString(currentAnswer + answer->c_str()));
+        }
+    }
+}
+
+std::shared_ptr<std::string>chatWindow::currentQuestion() {
+    return std::make_shared<std::string>(qlabel_Questions.back()->text().toStdString());
 }
 
 /*  scan2ocr takes a pdf file, transcodes it to TIFF G4 and assists in renaming the file.

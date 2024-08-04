@@ -16,11 +16,20 @@ public:
     explicit chatWindow(QWidget *parent = nullptr);
     ~chatWindow() = default;
 
-    void newAnswer (QString answer);
-    void newQuestion();
-    using AnswerCallback = std::function<void()>;
-    inline void setAnswerFunction (AnswerCallback callback){
-        answerCallback = callback;};
+    std::shared_ptr<std::string>currentQuestion();
+    void updateAnswer(std::string *answer);
+    using callForAnswer = std::function<void()>;
+
+    void setAnswerCallBack(chatWindow::callForAnswer answerCallback) {
+        answerCallBackPtr = answerCallback;
+    }
+
+    /*
+    @in:
+    std::string *Question
+    @out:
+    void *Answer (std::string *answer)  // Ptr to QLabel to write the answer
+    */
 
 private:
     static constexpr int SCROLLAREA_SPACING = 50;
@@ -33,15 +42,15 @@ private:
     QWidget scrollAreaWidgetContent;
     QVBoxLayout scrollLayout {&scrollAreaWidgetContent};
     
-    
-
     QLineEdit textPrompt {&centralWidget};
 
     std::vector<std::unique_ptr<QLabel>> qlabel_Questions;
     std::vector<std::unique_ptr<QLabel>> qlabel_Answers;
 
     void setupWidgets();
-    AnswerCallback answerCallback;
+    void newAnswer (QString answer);
+    void newQuestion();
+    callForAnswer answerCallBackPtr;
 };
 
 QT_END_NAMESPACE

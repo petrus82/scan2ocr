@@ -30,20 +30,12 @@ set(SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(SOURCE_FILES
   CMakeLists.txt
   scan2ocr.qrc
-  src/mainwindow.cpp
-  src/pdffile.cpp
-  src/scan2ocr.cpp
-  src/ftpconnection.cpp
-  src/parseurl.cpp
-  src/settings.cpp
-  src/mainwindow.h
-  src/pdffile.h
   src/BS_thread_pool.hpp
-  src/ftpconnection.h
-  src/parseurl.h
-  src/scan2ocr.h
-  src/settings.h
 )
+
+file(GLOB_RECURSE SOURCE_FILES_CPP ${SOURCE_DIRECTORY}/*.cpp)
+file(GLOB_RECURSE HEADER_FILES_H ${SOURCE_DIRECTORY}/*.h)
+list(APPEND SOURCE_FILES ${SOURCE_FILES_CPP} ${HEADER_FILES_H})
 
 qt_add_executable(scan2ocr  
     ${SOURCE_FILES}
