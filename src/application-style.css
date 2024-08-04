@@ -1,0 +1,23 @@
+.text-prompt-style{
+    color: black;
+    background-color: white;
+    border-radius: 10px;
+    border-style: outset;
+    border-width: 1px;
+    border-color: light-gray;
+}
+
+.chat-answer-style{
+    background-color: blue;
+    color: white;
+    border-radius: 10px;
+    margin: 30px;
+    al
+}
+
+.text-prompt-style{
+    background-color: white;
+    color: black;
+    border-radius: 10px;
+    margin: 30px;
+}
